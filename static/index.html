@@ -348,8 +348,14 @@
             </div>
             
             <div class="modal-body">
-                <div class="recipient-badge">
-                    Recipients: <b id="blast-recipient-count">0</b> candidates selected.
+                <div class="recipient-badge" style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                    <span>Recipients: <b id="blast-recipient-count">0</b> candidates selected.</span>
+                    <a href="#" id="link-show-recipients" onclick="toggleBlastRecipientsList(event)" style="color: var(--text-primary); font-weight: 700; font-size: 0.8rem; text-decoration: underline; cursor: pointer;">Show All</a>
+                </div>
+                
+                <!-- Collapsible Recipients List -->
+                <div id="blast-recipients-list" class="hidden" style="margin-top: 10px; max-height: 120px; overflow-y: auto; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background-color: #f8fafc; font-size: 0.85rem; line-height: 1.5; color: var(--text-secondary);">
+                    <!-- Names list populated via main.js -->
                 </div>
                 
                 <div class="input-group" style="margin-top: 15px;">

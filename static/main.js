@@ -310,14 +310,6 @@ function prevPage() {
     }
 }
 
-function nextPage() {
-    const totalPages = Math.ceil(allApplicants.length / rowsPerPage);
-    if (currentPage < totalPages) {
-        currentPage++;
-        displayApplicants();
-    }
-}
-
 // --- CHECKBOX SELECTION HANDLING ---
 function handleCandidateSelect(checkbox, id) {
     if (checkbox.checked) {
@@ -371,6 +363,13 @@ async function openBlastModal() {
     // Set recipient counts
     document.getElementById("blast-recipient-count").textContent = selectedCandidateIds.length;
     
+    // Populate recipient details list
+    const selectedApplicants = allApplicants.filter(c => selectedCandidateIds.includes(c.id));
+    const listDiv = document.getElementById("blast-recipients-list");
+    listDiv.innerHTML = selectedApplicants.map(c => `• <b>${c.name}</b> (${c.phone_number || 'No phone'}) - <i>${c.position_title}</i>`).join('<br>');
+    listDiv.classList.add("hidden");
+    document.getElementById("link-show-recipients").textContent = "Show All";
+    
     // Show loading state in text box and log terminal
     const txtArea = document.getElementById("blast-template-text");
     txtArea.value = "Loading message template...";
@@ -393,6 +392,19 @@ async function openBlastModal() {
     } catch (e) {
         txtArea.value = "Halo {{nama}},\n\nKami dari Inlife Surabaya...";
         txtArea.disabled = false;
+    }
+}
+
+function toggleBlastRecipientsList(event) {
+    if (event) event.preventDefault();
+    const listDiv = document.getElementById("blast-recipients-list");
+    const link = document.getElementById("link-show-recipients");
+    if (listDiv.classList.contains("hidden")) {
+        listDiv.classList.remove("hidden");
+        link.textContent = "Hide";
+    } else {
+        listDiv.classList.add("hidden");
+        link.textContent = "Show All";
     }
 }
 
