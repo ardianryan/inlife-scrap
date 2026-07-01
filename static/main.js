@@ -337,11 +337,22 @@ function displayApplicants() {
     document.getElementById("check-all-candidates").checked = allChecked;
     
     // Configure pagination panel visibility
-    if (allApplicants.length > rowsPerPage) {
+    if (allApplicants.length > 0) {
         pagControls.classList.remove("hidden");
         document.getElementById("page-indicator").textContent = `Page ${currentPage} of ${totalPages}`;
         document.getElementById("btn-prev-page").disabled = currentPage === 1;
         document.getElementById("btn-next-page").disabled = currentPage === totalPages;
+        
+        // Hide prev/next chevrons and page index if only 1 page exists
+        if (totalPages <= 1) {
+            document.getElementById("btn-prev-page").style.display = "none";
+            document.getElementById("btn-next-page").style.display = "none";
+            document.getElementById("page-indicator").style.display = "none";
+        } else {
+            document.getElementById("btn-prev-page").style.display = "inline-flex";
+            document.getElementById("btn-next-page").style.display = "inline-flex";
+            document.getElementById("page-indicator").style.display = "inline";
+        }
     } else {
         pagControls.classList.add("hidden");
     }
@@ -360,6 +371,17 @@ function nextPage() {
         currentPage++;
         displayApplicants();
     }
+}
+
+function changePageSize() {
+    const val = document.getElementById("select-page-size").value;
+    if (val === "all") {
+        rowsPerPage = 999999;
+    } else {
+        rowsPerPage = parseInt(val, 10);
+    }
+    currentPage = 1;
+    displayApplicants();
 }
 
 // --- CHECKBOX SELECTION HANDLING ---
