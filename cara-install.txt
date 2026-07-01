@@ -1,0 +1,49 @@
+========================================================================
+              INTERNSHIP SCRAPER CONSOLE - PANDUAN INSTALASI
+========================================================================
+
+Aplikasi ini dirancang 100% Plug & Play. Skrip peluncur otomatis akan 
+mengatur virtual environment, menginstal dependensi Python, serta mengunduh 
+dan menjalankan engine WhatsApp GOWA sesuai OS komputer Anda.
+
+------------------------------------------------------------------------
+PERSYARATAN UTAMA
+------------------------------------------------------------------------
+1. Python 3.9 atau lebih tinggi harus terpasang di komputer Anda.
+   - Unduh Python: https://www.python.org/downloads/
+   - Saat instalasi di Windows, pastikan Anda mencentang pilihan:
+     "Add Python.exe to PATH"
+
+------------------------------------------------------------------------
+CARA MENJALANKAN APLIKASI
+------------------------------------------------------------------------
+
+*** UNTUK PENGGUNA WINDOWS ***
+1. Cukup klik ganda (double-click) berkas bernama:
+   run.bat
+2. Skrip secara otomatis akan membuat virtual environment (.venv), 
+   menginstal pustaka yang diperlukan, mengunduh GOWA, dan membuka aplikasi.
+
+*** UNTUK PENGGUNA MAC / LINUX ***
+1. Buka Terminal Anda.
+2. Masuk ke direktori folder proyek ini.
+3. Berikan izin eksekusi untuk skrip peluncur (hanya perlu sekali saja):
+   chmod +x run.sh
+4. Jalankan aplikasi:
+   ./run.sh
+
+------------------------------------------------------------------------
+CARA MENGHUBUNGKAN WHATSAPP
+------------------------------------------------------------------------
+1. Setelah dasbor aplikasi terbuka, masuk ke tab "Configuration" di menu samping.
+2. Pada panel "WhatsApp Native Device Manager & Linker":
+   - Pilih metode penyambungan: "Scan QR Code" atau "Link with Pairing Code".
+   - Masukkan ID perangkat kustom pilihan Anda (contoh: "office-wa").
+   - Klik "Link Device".
+3. Ikuti panduan yang muncul di layar:
+   - Jika memilih QR: Buka WhatsApp HP Anda -> Perangkat Tertaut -> pindai kode QR.
+   - Jika memilih Code: Masukkan nomor WA Anda, klik "Get Pairing Code", lalu pilih
+     "Tautkan dengan nomor telepon" di HP Anda dan masukkan kode 8-digit yang tampil.
+4. Setelah sukses terhubung, centang kotak nomor WhatsApp yang ingin digunakan
+   pada checklist di bagian atas, klik "Save WhatsApp Settings", dan Anda siap 
+   melakukan blast pesan!

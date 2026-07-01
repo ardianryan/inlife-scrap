@@ -1,0 +1,49 @@
+========================================================================
+                 INTERNSHIP SCRAPER CONSOLE - INSTALLATION GUIDE
+========================================================================
+
+This application is designed to be 100% Plug & Play. The startup scripts
+will automatically handle virtual environment setup, install Python 
+dependencies, and download the GOWA WhatsApp engine for your OS.
+
+------------------------------------------------------------------------
+PREREQUISITES
+------------------------------------------------------------------------
+1. Python 3.9 or higher must be installed on your computer.
+   - Download Python: https://www.python.org/downloads/
+   - During installation on Windows, make sure to check the box that says:
+     "Add Python.exe to PATH"
+
+------------------------------------------------------------------------
+HOW TO RUN THE APPLICATION
+------------------------------------------------------------------------
+
+*** FOR WINDOWS USERS ***
+1. Simply double-click the file named:
+   run.bat
+2. The script will automatically create a virtual environment (.venv), 
+   install all required packages, download GOWA, and launch the console.
+
+*** FOR MAC / LINUX USERS ***
+1. Open your Terminal.
+2. Navigate to this project folder.
+3. Grant execution permission to the startup script (only needed once):
+   chmod +x run.sh
+4. Run the script:
+   ./run.sh
+
+------------------------------------------------------------------------
+HOW TO CONNECT WHATSAPP
+------------------------------------------------------------------------
+1. Once the application opens, go to the "Configuration" tab on the sidebar.
+2. In the "WhatsApp Native Device Manager & Linker" section:
+   - Select your preferred pairing method: "Scan QR Code" or "Link with Pairing Code".
+   - Enter a custom name for your device ID (e.g., "office-phone").
+   - Click "Link Device".
+3. Follow the onscreen instructions:
+   - If using QR: Open WhatsApp on your phone -> Linked Devices -> scan the QR code.
+   - If using Code: Enter your WhatsApp phone number, click "Get Pairing Code", 
+     then select "Link with Phone Number" on your mobile device and enter the code.
+4. Once connected successfully, check the checkboxes of the numbers you want
+   to use in the WhatsApp settings form above, click "Save WhatsApp Settings",
+   and you are ready to send messages!
