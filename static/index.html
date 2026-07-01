@@ -294,6 +294,10 @@
                             <input type="text" id="settings-wa-device" required placeholder="e.g. default">
                         </div>
                         <div class="input-group">
+                            <label for="settings-wa-delay">Delay Between Messages (Seconds)</label>
+                            <input type="number" id="settings-wa-delay" min="1" max="60" required placeholder="e.g. 5">
+                        </div>
+                        <div class="input-group">
                             <label for="settings-wa-template">Default Message Template</label>
                             <textarea id="settings-wa-template" rows="6" style="width:100%; font-family:inherit; padding:10px; border-radius:6px; border:1px solid var(--border-input); outline:none; resize:vertical;" placeholder="Write template text here..."></textarea>
                             <div style="font-size:0.78rem; color:var(--text-muted); margin-top:5px; line-height:1.4;">

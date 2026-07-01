@@ -119,6 +119,7 @@ def api_settings():
         wa_device_id = get_setting("wa_device_id", "default")
         wa_template = get_setting("wa_template", default_template)
         wa_test_phone = get_setting("wa_test_phone", "")
+        wa_delay = get_setting("wa_delay", "5")
         
         return jsonify({
             "mentor_email": email,
@@ -126,7 +127,8 @@ def api_settings():
             "wa_api_url": wa_api_url,
             "wa_device_id": wa_device_id,
             "wa_template": wa_template,
-            "wa_test_phone": wa_test_phone
+            "wa_test_phone": wa_test_phone,
+            "wa_delay": wa_delay
         })
     
     # POST request
@@ -137,6 +139,7 @@ def api_settings():
     wa_device_id = data.get("wa_device_id")
     wa_template = data.get("wa_template")
     wa_test_phone = data.get("wa_test_phone")
+    wa_delay = data.get("wa_delay")
     
     if email:
         set_setting("mentor_email", email)
@@ -150,6 +153,8 @@ def api_settings():
         set_setting("wa_template", wa_template)
     if wa_test_phone is not None:
         set_setting("wa_test_phone", wa_test_phone)
+    if wa_delay:
+        set_setting("wa_delay", str(wa_delay))
         
     return jsonify({"status": "success", "message": "Settings saved successfully"})
 
@@ -239,7 +244,13 @@ def run_wa_blast_thread(candidate_ids, template_msg, api_url, device_id):
     """Worker thread that formats messages and sends them to the local GOWA API."""
     global wa_blast_state
     try:
-        wa_blast_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] Memulai pengiriman blast WhatsApp ke {len(candidate_ids)} pelamar...")
+        # Load user configured delay setting (default: 5 seconds)
+        try:
+            delay_seconds = int(get_setting("wa_delay", "5"))
+        except Exception:
+            delay_seconds = 5
+            
+        wa_blast_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] Memulai pengiriman blast WhatsApp ke {len(candidate_ids)} pelamar (Delay: {delay_seconds} detik)...")
         
         # Connect to SQLite
         conn = sqlite3.connect(DB_PATH)
@@ -298,8 +309,8 @@ def run_wa_blast_thread(candidate_ids, template_msg, api_url, device_id):
                 wa_blast_state["failed_count"] += 1
                 wa_blast_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] GAGAL: {name} ({phone}) - Error koneksi: {str(err)}")
                 
-            # Jeda minimal 5 detik untuk menghindari deteksi spam / blokir
-            time.sleep(5)
+            # Jeda dinamis berdasarkan pengaturan user
+            time.sleep(delay_seconds)
             
         conn.close()
         wa_blast_state["status"] = "complete"

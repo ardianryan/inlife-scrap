@@ -430,7 +430,7 @@ async function startWaBlast() {
         if (response.ok) {
             // Show progress UI and poll progress every 500ms
             document.getElementById("blast-progress-section").classList.remove("hidden");
-            document.getElementById("blast-console-logs").innerHTML = `<div class="terminal-line">Starting WhatsApp broadcast scheduler (Min. 5s delay)...</div>`;
+            document.getElementById("blast-console-logs").innerHTML = `<div class="terminal-line">Starting WhatsApp broadcast scheduler...</div>`;
             
             pollBlastStatus();
         } else {
@@ -659,6 +659,7 @@ async function loadSettings() {
         document.getElementById("settings-wa-device").value = data.wa_device_id || "";
         document.getElementById("settings-wa-template").value = data.wa_template || "";
         document.getElementById("settings-wa-test-phone").value = data.wa_test_phone || "";
+        document.getElementById("settings-wa-delay").value = data.wa_delay || "5";
         
         // Reset check box and clear button
         document.getElementById("confirm-cache-clear").checked = false;
@@ -698,6 +699,7 @@ async function saveWaSettings(event) {
     const device = document.getElementById("settings-wa-device").value;
     const template = document.getElementById("settings-wa-template").value;
     const testPhone = document.getElementById("settings-wa-test-phone").value;
+    const delay = document.getElementById("settings-wa-delay").value;
     
     try {
         const response = await fetch(`${API_BASE}/api/settings`, {
@@ -707,7 +709,8 @@ async function saveWaSettings(event) {
                 wa_api_url: url,
                 wa_device_id: device,
                 wa_template: template,
-                wa_test_phone: testPhone
+                wa_test_phone: testPhone,
+                wa_delay: delay
             })
         });
         
