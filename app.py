@@ -416,6 +416,67 @@ def api_wa_devices():
     except Exception as e:
         return jsonify({"status": False, "message": f"Could not connect to GOWA server: {str(e)}", "data": []})
 
+@app.route('/api/wa/devices', methods=['POST'])
+def api_wa_create_device():
+    """Registers a new device ID in GOWA server."""
+    data = request.json or {}
+    device_id = data.get("device_id")
+    if not device_id:
+        return jsonify({"status": False, "message": "Device ID is required"}), 400
+        
+    api_url = get_setting("wa_api_url", "http://localhost:3000")
+    try:
+        res = requests.post(
+            f"{api_url.rstrip('/')}/devices",
+            json={"device_id": device_id},
+            headers={"Content-Type": "application/json"},
+            timeout=5
+        )
+        if res.status_code in [200, 201]:
+            return jsonify(res.json())
+        else:
+            return jsonify({"status": False, "message": f"GOWA returned HTTP {res.status_code}: {res.text}"}), res.status_code
+    except Exception as e:
+        return jsonify({"status": False, "message": f"Connection error: {str(e)}"}), 500
+
+@app.route('/api/wa/devices/<device_id>', methods=['DELETE'])
+def api_wa_delete_device(device_id):
+    """Deletes/unregisters a device ID from GOWA server."""
+    api_url = get_setting("wa_api_url", "http://localhost:3000")
+    try:
+        res = requests.delete(
+            f"{api_url.rstrip('/')}/devices/{device_id}",
+            timeout=5
+        )
+        if res.status_code == 200:
+            return jsonify(res.json())
+        else:
+            return jsonify({"status": False, "message": f"GOWA returned HTTP {res.status_code}"}), res.status_code
+    except Exception as e:
+        return jsonify({"status": False, "message": f"Connection error: {str(e)}"}), 500
+
+@app.route('/api/wa/login', methods=['POST'])
+def api_wa_login():
+    """Fetches the WhatsApp login QR code link for a device from GOWA."""
+    data = request.json or {}
+    device_id = data.get("device_id")
+    if not device_id:
+        return jsonify({"status": False, "message": "Device ID is required"}), 400
+        
+    api_url = get_setting("wa_api_url", "http://localhost:3000")
+    try:
+        res = requests.get(
+            f"{api_url.rstrip('/')}/app/login",
+            headers={"X-Device-Id": device_id},
+            timeout=5
+        )
+        if res.status_code == 200:
+            return jsonify(res.json())
+        else:
+            return jsonify({"status": False, "message": f"GOWA returned HTTP {res.status_code}: {res.text}"}), res.status_code
+    except Exception as e:
+        return jsonify({"status": False, "message": f"Connection error: {str(e)}"}), 500
+
 @app.route('/api/wa/blast/status', methods=['GET'])
 def api_wa_blast_status():
     """Returns the current background WhatsApp blast progress logs and counts."""

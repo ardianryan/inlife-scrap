@@ -931,6 +931,10 @@ async function fetchGowaDevices(savedDeviceIdsStr = "") {
                 </div>
             `;
         }
+        
+        // Render native device manager list below
+        renderNativeDevicesList();
+        
     } catch (err) {
         console.error("Failed to fetch devices:", err);
         container.innerHTML = `
@@ -938,6 +942,10 @@ async function fetchGowaDevices(savedDeviceIdsStr = "") {
                 Failed to connect to GOWA server. Make sure GOWA is active on port 3000.
             </span>
         `;
+        const listContainer = document.getElementById("native-device-list-container");
+        if (listContainer) {
+            listContainer.innerHTML = '<span style="font-size: 0.85rem; color: #dc2626;">GOWA server connection failed.</span>';
+        }
     }
 }
 
@@ -962,5 +970,206 @@ async function clearCache() {
         }
     } catch (e) {
         alert("Server error occurred.");
+    }
+}
+
+// --- NATIVE WHATSAPP DEVICE PAIRING & MANAGER ---
+let nativeQrInterval = null;
+let nativeStatusPollInterval = null;
+let activePairingDeviceId = "";
+let nativeQrDurationSec = 0;
+
+async function startNativeDevicePairing() {
+    const input = document.getElementById("pair-new-device-id");
+    const deviceId = input.value.trim();
+    if (!deviceId) {
+        alert("Please enter a Device ID to pair!");
+        return;
+    }
+    
+    // Check if deviceId has invalid characters
+    if (!/^[a-zA-Z0-9\-_]+$/.test(deviceId)) {
+        alert("Device ID must be alphanumeric (a-z, A-Z, 0-9, - or _ only).");
+        return;
+    }
+    
+    const btn = document.getElementById("btn-pair-device");
+    const origText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `<span class="material-icons" style="font-size: 1.1rem; margin-right: 4px; animation: spin 1s infinite linear;">sync</span> Linking...`;
+    
+    try {
+        // 1. Register device POST /api/wa/devices
+        const regRes = await fetch(`${API_BASE}/api/wa/devices`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ device_id: deviceId })
+        });
+        
+        activePairingDeviceId = deviceId;
+        
+        // 2. Load and display QR code
+        await loadNativeQrCode();
+        
+        // 3. Start status polling to detect successful connection
+        startNativeStatusPolling(deviceId);
+        
+    } catch (err) {
+        alert("Failed to initiate pairing: " + err.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = origText;
+    }
+}
+
+async function loadNativeQrCode() {
+    if (!activePairingDeviceId) return;
+    
+    const qrBox = document.getElementById("native-qr-pairing-box");
+    const qrImg = document.getElementById("native-qr-img");
+    const loader = document.getElementById("native-qr-loader");
+    const timerText = document.getElementById("native-qr-seconds");
+    
+    loader.classList.remove("hidden");
+    qrBox.classList.remove("hidden");
+    
+    try {
+        const loginRes = await fetch(`${API_BASE}/api/wa/login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ device_id: activePairingDeviceId })
+        });
+        
+        const data = await loginRes.json();
+        if (loginRes.ok && data && data.results) {
+            qrImg.src = data.results.qr_link;
+            nativeQrDurationSec = data.results.qr_duration || 60;
+            timerText.textContent = nativeQrDurationSec;
+            
+            // Start countdown
+            clearInterval(nativeQrInterval);
+            nativeQrInterval = setInterval(() => {
+                if (nativeQrDurationSec > 0) {
+                    nativeQrDurationSec--;
+                    timerText.textContent = nativeQrDurationSec;
+                } else {
+                    // Refresh QR when countdown ends
+                    clearInterval(nativeQrInterval);
+                    loadNativeQrCode();
+                }
+            }, 1000);
+        } else {
+            // Already logged in or error
+            const msg = data ? data.message : "Error fetching QR";
+            if (msg.includes("already logged in")) {
+                alert(`Device "${activePairingDeviceId}" is already connected!`);
+                qrBox.classList.add("hidden");
+                clearInterval(nativeQrInterval);
+                fetchGowaDevices();
+            } else {
+                throw new Error(msg);
+            }
+        }
+    } catch (e) {
+        console.error("Failed to load QR code:", e);
+        clearInterval(nativeQrInterval);
+        qrBox.classList.add("hidden");
+        alert("Error generating QR code: " + e.message);
+    } finally {
+        loader.classList.add("hidden");
+    }
+}
+
+function startNativeStatusPolling(deviceId) {
+    clearInterval(nativeStatusPollInterval);
+    nativeStatusPollInterval = setInterval(async () => {
+        try {
+            const res = await fetch(`${API_BASE}/api/wa/devices`);
+            const json = await res.json();
+            const list = json.results || json.data || [];
+            const device = list.find(d => (d.id || d.device_id) === deviceId);
+            if (device && (device.state === "logged_in" || device.status === "connected")) {
+                // Success!
+                clearInterval(nativeStatusPollInterval);
+                clearInterval(nativeQrInterval);
+                document.getElementById("native-qr-pairing-box").classList.add("hidden");
+                alert(`WhatsApp device "${deviceId}" has been successfully connected!`);
+                document.getElementById("pair-new-device-id").value = "";
+                // Reload lists
+                fetchGowaDevices();
+            }
+        } catch (e) {
+            console.error("Status polling error:", e);
+        }
+    }, 3000);
+}
+
+async function renderNativeDevicesList() {
+    const listContainer = document.getElementById("native-device-list-container");
+    if (!listContainer) return;
+    
+    try {
+        const response = await fetch(`${API_BASE}/api/wa/devices`);
+        const json = await response.json();
+        
+        const list = json.results || json.data || [];
+        const isSuccess = json.status !== false && json.code !== "ERROR";
+        
+        if (isSuccess && list.length > 0) {
+            listContainer.innerHTML = "";
+            list.forEach(dev => {
+                const devId = dev.id || dev.device_id;
+                const devState = dev.state || dev.status || "offline";
+                const devName = dev.display_name || dev.name || "Unnamed Device";
+                const isConnected = devState === "connected" || devState === "logged_in";
+                const badgeColor = isConnected ? "#22c55e" : "#ef4444";
+                const displayState = devState === "logged_in" ? "connected" : devState;
+                const displayJid = dev.jid || "-";
+                
+                const itemHTML = `
+                    <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.82rem; padding: 6px 8px; background: #fff; border: 1px solid var(--border-color); border-radius: 4px;">
+                        <div style="display: flex; flex-direction: column; gap: 2px;">
+                            <span style="font-weight: 700; color: var(--text-primary);">${devId} <span style="font-weight: 500; color: var(--text-secondary); font-size: 0.75rem;">(${devName})</span></span>
+                            <span style="font-size: 0.72rem; color: var(--text-muted);">JID: ${displayJid}</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="font-size: 0.7rem; font-weight: 700; padding: 1px 6px; border-radius: 100px; background-color: ${badgeColor}10; color: ${badgeColor}; border: 1px solid ${badgeColor}20;">
+                                ${displayState}
+                            </span>
+                            <button type="button" onclick="deleteNativeDevice('${devId}')" style="color: #ef4444; background: none; border: none; cursor: pointer; display: inline-flex; padding: 2px;" title="Delete device">
+                                <span class="material-icons" style="font-size: 1.15rem;">delete</span>
+                            </button>
+                        </div>
+                    </div>
+                `;
+                listContainer.insertAdjacentHTML("beforeend", itemHTML);
+            });
+        } else {
+            listContainer.innerHTML = '<span style="font-size: 0.85rem; color: var(--text-muted);">No devices created yet.</span>';
+        }
+    } catch (e) {
+        listContainer.innerHTML = '<span style="font-size: 0.85rem; color: #dc2626;">Failed to load devices list.</span>';
+    }
+}
+
+async function deleteNativeDevice(deviceId) {
+    if (!confirm(`Are you sure you want to delete/unlink device "${deviceId}"?`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE}/api/wa/devices/${encodeURIComponent(deviceId)}`, {
+            method: "DELETE"
+        });
+        const result = await response.json();
+        if (response.ok) {
+            alert(`Device "${deviceId}" has been deleted.`);
+            // Refresh checklists and list
+            fetchGowaDevices();
+        } else {
+            alert("Failed to delete device: " + result.message);
+        }
+    } catch (e) {
+        alert("Error calling delete API: " + e.message);
     }
 }
