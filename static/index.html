@@ -346,24 +346,43 @@
                 <div class="panel panel-bordered" style="margin-top: 25px;">
                     <h5 class="panel-title">WhatsApp Native Device Manager & Linker</h5>
                     <p style="font-size: 0.88rem; color: var(--text-secondary); margin-bottom: 15px;">
-                        Tautkan akun WhatsApp baru ke aplikasi. Masukkan nama/ID perangkat kustom (contoh: <code>office-wa</code>), lalu pindai kode QR yang muncul.
+                        Tautkan akun WhatsApp baru ke aplikasi. Pilih metode tautan (QR atau Kode), lalu hubungkan nomor WhatsApp Anda.
                     </p>
                     
                     <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 20px; align-items: start;">
                         <!-- Left Panel: Create and list devices -->
                         <div style="display: flex; flex-direction: column; gap: 15px;">
-                            <div class="input-group" style="margin-bottom: 0;">
-                                <label for="pair-new-device-id" style="font-weight: 600;">Link New Device ID</label>
-                                <div style="display: flex; gap: 8px; margin-top: 5px;">
-                                    <input type="text" id="pair-new-device-id" placeholder="e.g. office-wa" style="flex: 1; min-width: 0; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-input);">
-                                    <button type="button" onclick="startNativeDevicePairing()" class="btn btn-primary" id="btn-pair-device" style="white-space: nowrap; height: 38px; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; gap: 4px;">
-                                        <span class="material-icons" style="font-size: 1.1rem;">qr_code_2</span> Link Device
-                                    </button>
+                            <!-- Pairing Method Selector -->
+                            <div>
+                                <label style="font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; display: block; font-size: 0.9rem;">Pairing Method</label>
+                                <div style="display: flex; gap: 20px; margin-top: 6px;">
+                                    <label style="display: flex; align-items: center; gap: 6px; font-size: 0.88rem; font-weight: 600; cursor: pointer; user-select: none;">
+                                        <input type="radio" name="pairing-method" value="qr" checked onchange="togglePairingMethod('qr')">
+                                        <span>Scan QR Code</span>
+                                    </label>
+                                    <label style="display: flex; align-items: center; gap: 6px; font-size: 0.88rem; font-weight: 600; cursor: pointer; user-select: none;">
+                                        <input type="radio" name="pairing-method" value="code" onchange="togglePairingMethod('code')">
+                                        <span>Link with Pairing Code</span>
+                                    </label>
                                 </div>
                             </div>
+
+                            <div class="input-group" style="margin-bottom: 0;">
+                                <label for="pair-new-device-id" style="font-weight: 600;">Link New Device ID</label>
+                                <input type="text" id="pair-new-device-id" placeholder="e.g. office-wa" style="margin-top: 5px; width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-input);">
+                            </div>
+
+                            <div class="input-group hidden" id="pair-device-phone-group" style="margin-bottom: 0;">
+                                <label for="pair-device-phone" style="font-weight: 600;">WhatsApp Phone Number</label>
+                                <input type="text" id="pair-device-phone" placeholder="e.g. 628123456789 (with country code)" style="margin-top: 5px; width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-input);">
+                            </div>
+
+                            <button type="button" onclick="startNativeDevicePairing()" class="btn btn-primary" id="btn-pair-device" style="width: 100%; height: 38px; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; gap: 4px; margin-top: 5px;">
+                                <span class="material-icons" style="font-size: 1.1rem;">qr_code_2</span> Link Device
+                            </button>
                             
                             <!-- Connected list -->
-                            <div>
+                            <div style="margin-top: 5px;">
                                 <label style="font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; display: block; font-size: 0.9rem;">Active WhatsApp Accounts List</label>
                                 <div id="native-device-list-container" style="padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background-color: #f8fafc; display: flex; flex-direction: column; gap: 8px; max-height: 200px; overflow-y: auto; min-height: 60px;">
                                     <span style="font-size: 0.85rem; color: var(--text-muted);">Loading devices...</span>
@@ -371,17 +390,34 @@
                             </div>
                         </div>
                         
-                        <!-- Right Panel: QR Code and instruction -->
-                        <div id="native-qr-pairing-box" class="hidden" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 15px; border: 1px dashed var(--border-input); border-radius: 8px; background-color: #fafafa; text-align: center; min-height: 250px;">
-                            <div style="font-weight: 700; color: var(--text-primary); margin-bottom: 10px; font-size: 0.92rem;">Scan QR to Connect WhatsApp</div>
-                            <div style="position: relative; background: #fff; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; width: 220px; height: 220px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05);">
-                                <img id="native-qr-img" src="" alt="Pairing QR Code" style="width: 200px; height: 200px; display: block;">
-                                <div id="native-qr-loader" class="hidden" style="position: absolute; inset: 0; background: rgba(255,255,255,0.9); display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">
-                                    Refreshing QR...
+                        <!-- Right Panel QR/Code Box container -->
+                        <div>
+                            <!-- QR Code box -->
+                            <div id="native-qr-pairing-box" class="hidden" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 15px; border: 1px dashed var(--border-input); border-radius: 8px; background-color: #fafafa; text-align: center; min-height: 250px;">
+                                <div style="font-weight: 700; color: var(--text-primary); margin-bottom: 10px; font-size: 0.92rem;">Scan QR to Connect WhatsApp</div>
+                                <div style="position: relative; background: #fff; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; width: 220px; height: 220px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05);">
+                                    <img id="native-qr-img" src="" alt="Pairing QR Code" style="width: 200px; height: 200px; display: block;">
+                                    <div id="native-qr-loader" class="hidden" style="position: absolute; inset: 0; background: rgba(255,255,255,0.9); display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">
+                                        Refreshing QR...
+                                    </div>
+                                </div>
+                                <div id="native-qr-timer" style="font-size: 0.78rem; color: var(--text-muted); margin-top: 10px;">
+                                    QR Code expires in <b id="native-qr-seconds">0</b> seconds.
                                 </div>
                             </div>
-                            <div id="native-qr-timer" style="font-size: 0.78rem; color: var(--text-muted); margin-top: 10px;">
-                                QR Code expires in <b id="native-qr-seconds">0</b> seconds.
+
+                            <!-- Pairing Code box -->
+                            <div id="native-code-pairing-box" class="hidden" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 15px; border: 1px dashed var(--border-input); border-radius: 8px; background-color: #fafafa; text-align: center; min-height: 250px;">
+                                <div style="font-weight: 700; color: var(--text-primary); margin-bottom: 10px; font-size: 0.92rem;">WhatsApp Pairing Code</div>
+                                <div style="background: #fff; padding: 20px; border: 1px solid var(--border-color); border-radius: 6px; width: 220px; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05);">
+                                    <div id="native-pair-code-display" style="font-size: 2.2rem; font-weight: 800; color: var(--color-primary); letter-spacing: 2px; font-family: monospace; line-height: 1.2;">----</div>
+                                    <div id="native-code-loader" class="hidden" style="margin-top: 10px; font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);">
+                                        Fetching Code...
+                                    </div>
+                                </div>
+                                <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 15px; line-height: 1.4; max-width: 240px;">
+                                    Buka WhatsApp HP Anda &rarr; Perangkat Tertaut &rarr; <b>Tautkan dengan nomor telepon</b>, lalu masukkan kode di atas.
+                                </div>
                             </div>
                         </div>
                     </div>

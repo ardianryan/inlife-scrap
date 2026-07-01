@@ -979,6 +979,26 @@ let nativeStatusPollInterval = null;
 let activePairingDeviceId = "";
 let nativeQrDurationSec = 0;
 
+function togglePairingMethod(method) {
+    const phoneGroup = document.getElementById("pair-device-phone-group");
+    const qrBox = document.getElementById("native-qr-pairing-box");
+    const codeBox = document.getElementById("native-code-pairing-box");
+    const btn = document.getElementById("btn-pair-device");
+    
+    if (method === "qr") {
+        phoneGroup.classList.add("hidden");
+        btn.innerHTML = `<span class="material-icons" style="font-size: 1.1rem; margin-right: 4px; vertical-align: middle;">qr_code_2</span> Link Device`;
+    } else {
+        phoneGroup.classList.remove("hidden");
+        btn.innerHTML = `<span class="material-icons" style="font-size: 1.1rem; margin-right: 4px; vertical-align: middle;">vpn_key</span> Get Pairing Code`;
+    }
+    
+    // Reset pairing display
+    qrBox.classList.add("hidden");
+    codeBox.classList.add("hidden");
+    clearInterval(nativeQrInterval);
+}
+
 async function startNativeDevicePairing() {
     const input = document.getElementById("pair-new-device-id");
     const deviceId = input.value.trim();
@@ -987,20 +1007,36 @@ async function startNativeDevicePairing() {
         return;
     }
     
-    // Check if deviceId has invalid characters
     if (!/^[a-zA-Z0-9\-_]+$/.test(deviceId)) {
         alert("Device ID must be alphanumeric (a-z, A-Z, 0-9, - or _ only).");
         return;
     }
     
+    const method = document.querySelector("input[name='pairing-method']:checked").value;
+    let phone = "";
+    if (method === "code") {
+        phone = document.getElementById("pair-device-phone").value.trim();
+        if (!phone) {
+            alert("Please enter your WhatsApp Phone Number!");
+            return;
+        }
+        // Sanitize phone to only digits
+        phone = phone.replace(/\D/g, "");
+    }
+    
     const btn = document.getElementById("btn-pair-device");
     const origText = btn.innerHTML;
     btn.disabled = true;
-    btn.innerHTML = `<span class="material-icons" style="font-size: 1.1rem; margin-right: 4px; animation: spin 1s infinite linear;">sync</span> Linking...`;
+    btn.innerHTML = `<span class="material-icons" style="font-size: 1.1rem; margin-right: 4px; animation: spin 1s infinite linear; vertical-align: middle;">sync</span> Linking...`;
+    
+    // Hide previous UI results
+    document.getElementById("native-qr-pairing-box").classList.add("hidden");
+    document.getElementById("native-code-pairing-box").classList.add("hidden");
+    clearInterval(nativeQrInterval);
     
     try {
         // 1. Register device POST /api/wa/devices
-        const regRes = await fetch(`${API_BASE}/api/wa/devices`, {
+        await fetch(`${API_BASE}/api/wa/devices`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ device_id: deviceId })
@@ -1008,8 +1044,13 @@ async function startNativeDevicePairing() {
         
         activePairingDeviceId = deviceId;
         
-        // 2. Load and display QR code
-        await loadNativeQrCode();
+        if (method === "qr") {
+            // QR flow
+            await loadNativeQrCode();
+        } else {
+            // Code flow
+            await loadNativePairingCode(phone);
+        }
         
         // 3. Start status polling to detect successful connection
         startNativeStatusPolling(deviceId);
@@ -1019,6 +1060,46 @@ async function startNativeDevicePairing() {
     } finally {
         btn.disabled = false;
         btn.innerHTML = origText;
+    }
+}
+
+async function loadNativePairingCode(phone) {
+    if (!activePairingDeviceId) return;
+    
+    const codeBox = document.getElementById("native-code-pairing-box");
+    const codeDisplay = document.getElementById("native-pair-code-display");
+    const loader = document.getElementById("native-code-loader");
+    
+    loader.classList.remove("hidden");
+    codeBox.classList.remove("hidden");
+    codeDisplay.textContent = "----";
+    
+    try {
+        const response = await fetch(`${API_BASE}/api/wa/login-code`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ device_id: activePairingDeviceId, phone: phone })
+        });
+        
+        const data = await response.json();
+        if (response.ok && data && data.results) {
+            codeDisplay.textContent = data.results.pair_code;
+        } else {
+            const msg = data ? data.message : "Error fetching pair code";
+            if (msg.includes("already logged in")) {
+                alert(`Device "${activePairingDeviceId}" is already connected!`);
+                codeBox.classList.add("hidden");
+                fetchGowaDevices();
+            } else {
+                throw new Error(msg);
+            }
+        }
+    } catch (e) {
+        console.error("Failed to load pairing code:", e);
+        codeBox.classList.add("hidden");
+        alert("Error generating pairing code: " + e.message);
+    } finally {
+        loader.classList.add("hidden");
     }
 }
 
