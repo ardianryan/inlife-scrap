@@ -328,6 +328,7 @@ st.markdown("""
 stats = get_stats()
 db_exists = os.path.exists(DB_PATH)
 db_size_kb = os.path.getsize(DB_PATH) / 1024 if db_exists else 0
+unique_positions_count = len(stats.get("position_distribution", {}))
 
 # Sidebar inputs for session info, navigation, and logout
 with st.sidebar:
@@ -336,7 +337,7 @@ with st.sidebar:
     
     st.markdown("<div style='height: 15px;'></div>", unsafe_allow_html=True)
     
-    # Custom HTML Sidebar Navigation Links (Soft Grayish Slate Active Highlight)
+    # Custom HTML Sidebar Navigation Links
     st.markdown("### Navigation")
     
     active_dash = "active" if st.session_state.current_page == "Dashboard" else ""
@@ -390,7 +391,7 @@ if st.session_state.current_page == "Dashboard":
     </div>
     """, unsafe_allow_html=True)
 
-    # KPI Cards layout using the double-bezel custom HTML with Material Icons
+    # KPI Cards layout (Dynamic Overview)
     col1, col2, col3 = st.columns(3)
     with col1:
         st.markdown(f"""
@@ -409,10 +410,10 @@ if st.session_state.current_page == "Dashboard":
         <div class="bezel-shell">
             <div class="bezel-core" style="display: flex; justify-content: space-between; align-items: flex-start;">
                 <div>
-                    <div class="kpi-title">Sistem Informasi Applicants</div>
-                    <div class="kpi-value">{stats.get("position_distribution", {}).get("SISTEM INFORMASI", 0)}</div>
+                    <div class="kpi-title">Active Positions</div>
+                    <div class="kpi-value">{unique_positions_count}</div>
                 </div>
-                <span class="material-icons" style="color: #64748b; font-size: 1.6rem; margin-top: 2px;">terminal</span>
+                <span class="material-icons" style="color: #64748b; font-size: 1.6rem; margin-top: 2px;">work</span>
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -442,6 +443,50 @@ if st.session_state.current_page == "Dashboard":
         </div>
         """, unsafe_allow_html=True)
         
+    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+    
+    # --- POSITION DISTRIBUTION BREAKDOWN ---
+    position_dist = stats.get("position_distribution", {})
+    if position_dist:
+        with st.container(border=True):
+            st.markdown("<h5 style='margin-bottom: 15px; font-family: \"Outfit\"; font-weight: 600;'>Candidate Distribution by Position</h5>", unsafe_allow_html=True)
+            total_cand = stats.get("total", 0)
+            
+            # Split items into two columns
+            sorted_dist = sorted(position_dist.items(), key=lambda x: x[1], reverse=True)
+            mid = (len(sorted_dist) + 1) // 2
+            col_left, col_right = st.columns(2)
+            
+            with col_left:
+                for pos, count in sorted_dist[:mid]:
+                    pct = (count / total_cand) * 100 if total_cand > 0 else 0
+                    st.markdown(f"""
+                    <div style="margin-bottom: 14px;">
+                        <div style="display: flex; justify-content: space-between; font-size: 0.88rem; font-weight: 600; color: #475569; margin-bottom: 4px;">
+                            <span>{pos}</span>
+                            <span style="color: #0f172a;">{count} ({pct:.1f}%)</span>
+                        </div>
+                        <div style="background-color: #f1f5f9; border-radius: 100px; height: 6px; width: 100%;">
+                            <div style="background-color: #64748b; height: 6px; border-radius: 100px; width: {pct}%;"></div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+            
+            with col_right:
+                for pos, count in sorted_dist[mid:]:
+                    pct = (count / total_cand) * 100 if total_cand > 0 else 0
+                    st.markdown(f"""
+                    <div style="margin-bottom: 14px;">
+                        <div style="display: flex; justify-content: space-between; font-size: 0.88rem; font-weight: 600; color: #475569; margin-bottom: 4px;">
+                            <span>{pos}</span>
+                            <span style="color: #0f172a;">{count} ({pct:.1f}%)</span>
+                        </div>
+                        <div style="background-color: #f1f5f9; border-radius: 100px; height: 6px; width: 100%;">
+                            <div style="background-color: #64748b; height: 6px; border-radius: 100px; width: {pct}%;"></div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
     st.markdown("<div style='height: 15px;'></div>", unsafe_allow_html=True)
     
     # Wrap filters in a beautiful structural container
@@ -531,6 +576,7 @@ if st.session_state.current_page == "Dashboard":
         st.markdown("### Export Interface")
         st.write("Download formatted Excel document containing: **Nama**, **Nomor WA/HP**, and **Email**.")
         
+        # Download button
         st.download_button(
             label=f"Download Excel ({len(export_df)} rows)",
             data=buffer,
