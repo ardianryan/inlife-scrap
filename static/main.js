@@ -9,6 +9,7 @@ let allApplicants = [];
 let currentPage = 1;
 const rowsPerPage = 10;
 let selectedCandidateIds = [];
+let currentWaTemplate = "";
 
 // --- INITIALIZATION & SESSION PERSISTENCE ---
 document.addEventListener("DOMContentLoaded", () => {
@@ -126,6 +127,15 @@ async function loadDashboard() {
         // Render Position Breakdown Bars
         renderPositionBreakdown(stats.position_distribution, stats.total);
         
+        // Fetch WA settings template to populate the global template variable
+        try {
+            const settingsRes = await fetch(`${API_BASE}/api/settings`);
+            const settingsData = await settingsRes.json();
+            currentWaTemplate = settingsData.wa_template || "";
+        } catch (err) {
+            console.error("Failed to load WhatsApp template settings:", err);
+        }
+
         // Load filter lists once
         await loadFilterOptions();
         
@@ -272,6 +282,33 @@ function displayApplicants() {
             badgeClass = "berkas";
         }
         
+        // Construct wa.me link with customized template message
+        let phoneCellHTML = "-";
+        if (c.phone_number) {
+            let cleanPhone = c.phone_number.replace(/\D/g, "");
+            if (cleanPhone.startsWith("0")) {
+                cleanPhone = "62" + cleanPhone.substring(1);
+            }
+            
+            // Format message variables
+            let msg = currentWaTemplate || "Halo {{nama}},\n\nKami dari Inlife Surabaya...";
+            msg = msg.replace(/\{\{nama\}\}/gi, c.name);
+            msg = msg.replace(/\{\{posisi\}\}/gi, c.position_title);
+            msg = msg.replace(/\{\{kampus\}\}/gi, c.university);
+            
+            const encodedMsg = encodeURIComponent(msg);
+            const waMeUrl = `https://wa.me/${cleanPhone}?text=${encodedMsg}`;
+            
+            phoneCellHTML = `
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px;">
+                    <span title="${c.phone_number}">${c.phone_number}</span>
+                    <a href="${waMeUrl}" target="_blank" class="wa-quick-link" title="Kirim pesan langsung lewat WhatsApp Web/App" style="color: #22c55e; display: inline-flex; align-items: center; text-decoration: none;">
+                        <span class="material-icons" style="font-size: 1.15rem;">chat</span>
+                    </a>
+                </div>
+            `;
+        }
+        
         const rowHTML = `
             <tr>
                 <td style="text-align: center;">
@@ -280,7 +317,7 @@ function displayApplicants() {
                 <td style="font-weight: 700; color: #0f172a;" title="${c.name}">${c.name}</td>
                 <td title="${c.major}">${c.major}</td>
                 <td title="${c.university}">${c.university}</td>
-                <td title="${c.phone_number || "-"}">${c.phone_number || "-"}</td>
+                <td>${phoneCellHTML}</td>
                 <td title="${c.email || "-"}">${c.email || "-"}</td>
                 <td title="${c.position_title}">${c.position_title}</td>
                 <td><span class="stage-badge ${badgeClass}">${displayStage}</span></td>
