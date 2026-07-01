@@ -7,8 +7,23 @@ import io
 import threading
 import time
 import requests
+import signal
+import sys
 from datetime import datetime
 from db import init_db, save_applicant, get_applicants, get_positions, get_majors, get_stats, DB_PATH, get_setting, set_setting
+
+# Handle SIGTERM/SIGINT signals to cleanly terminate background GOWA child process
+def handle_termination_signals(signum, frame):
+    print(f"[App] Caught termination signal {signum}. Cleaning up background tasks...")
+    try:
+        import gowa_manager
+        gowa_manager.cleanup_gowa()
+    except Exception as e:
+        print("[App] Error during signal cleanup:", str(e))
+    sys.exit(0)
+
+signal.signal(signal.SIGTERM, handle_termination_signals)
+signal.signal(signal.SIGINT, handle_termination_signals)
 
 # Initialize Flask app serving from static directory
 app = Flask(__name__, static_folder='static')
