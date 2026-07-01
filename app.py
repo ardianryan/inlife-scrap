@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import io
 import os
+import requests
 import sqlite3
 from datetime import datetime
 from db import init_db, save_applicant, get_applicants, get_positions, get_majors, get_stats, DB_PATH, get_setting, set_setting
@@ -18,6 +19,17 @@ st.set_page_config(
 # Initialize Database
 init_db()
 
+# --- CACHED NETWORK STATUS CHECKER ---
+# Cache the check for 10 seconds to keep UI responsive and fast
+@st.cache_data(ttl=10)
+def check_online():
+    try:
+        # Use HEAD request for maximum speed
+        requests.head("https://apply.inlifesurabaya.com/login", timeout=1.5)
+        return True
+    except requests.RequestException:
+        return False
+
 # --- SESSION & COOKIE PERSISTENCE ---
 if "authenticated" not in st.session_state:
     if st.query_params.get("session") == "authenticated":
@@ -31,6 +43,9 @@ if query_page in ["Dashboard", "Sync", "Settings"]:
     st.session_state.current_page = query_page
 else:
     st.session_state.current_page = "Dashboard"
+
+# Check network connectivity status
+is_online = check_online()
 
 # Render Login Page if not authenticated
 if not st.session_state.authenticated:
@@ -363,6 +378,14 @@ with st.sidebar:
     
     st.markdown("<hr style='margin: 15px 0; border:0; border-top:1px solid rgba(0,0,0,0.06);'>", unsafe_allow_html=True)
     
+    st.markdown("### Connection")
+    if is_online:
+        st.markdown("Status: **🟢 Online**")
+    else:
+        st.markdown("Status: **🔴 Offline** (Sync Locked)")
+        
+    st.markdown("<hr style='margin: 15px 0; border:0; border-top:1px solid rgba(0,0,0,0.06);'>", unsafe_allow_html=True)
+    
     st.markdown("### User Session")
     st.markdown("Role: **Administrator**")
     
@@ -602,10 +625,22 @@ elif st.session_state.current_page == "Sync":
     
     st.write(f"Authorized Scraper Account: `{mentor_email}`")
     
-    # Sync button
-    start_scraping = st.button("Sync Now", use_container_width=True, type="primary")
+    # Check if network is offline to toggle synchronization
+    if not is_online:
+        st.warning("⚠️ Offline. Please connect to the internet to synchronize data.")
+    else:
+        st.success("🟢 Ready. Connection established to the mentor portal.")
+        
+    # Sync button (Disabled if offline)
+    start_scraping = st.button(
+        "Sync Now", 
+        use_container_width=True, 
+        type="primary", 
+        disabled=not is_online,
+        help="Please connect to the internet to sync data." if not is_online else None
+    )
     
-    if start_scraping:
+    if start_scraping and is_online:
         progress_bar = st.progress(0.0)
         status_text = st.empty()
         console_logs = st.empty()
