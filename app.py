@@ -1,6 +1,7 @@
 from flask import Flask, jsonify, request, send_from_directory, send_file
 from flask_cors import CORS
 import sqlite3
+import pandas as pd
 import os
 import io
 import threading
@@ -240,6 +241,8 @@ def clean_phone_number(phone):
         cleaned = cleaned + "@s.whatsapp.net"
     return cleaned
 
+wa_blast_lock = threading.Lock()
+
 def run_wa_blast_thread(candidate_ids, template_msg, api_url, device_id):
     """Worker thread that formats messages and sends them to the local GOWA API."""
     global wa_blast_state
@@ -319,11 +322,19 @@ def run_wa_blast_thread(candidate_ids, template_msg, api_url, device_id):
     except Exception as e:
         wa_blast_state["status"] = "error"
         wa_blast_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] FATAL ERROR: {str(e)}")
+    finally:
+        # Release the lock so other blast processes can run later
+        try:
+            wa_blast_lock.release()
+        except RuntimeError:
+            pass
 
 @app.route('/api/wa/blast', methods=['POST'])
 def api_wa_blast():
     """Triggers background WhatsApp broadcast thread."""
     global wa_blast_state
+    
+    # Check state status first
     if wa_blast_state["status"] == "sending":
         return jsonify({"status": "error", "message": "WhatsApp blast is already running"}), 400
         
@@ -339,20 +350,31 @@ def api_wa_blast():
     api_url = get_setting("wa_api_url", "http://localhost:3000")
     device_id = get_setting("wa_device_id", "default")
     
-    # Reset state
-    wa_blast_state["status"] = "sending"
-    wa_blast_state["current"] = 0
-    wa_blast_state["total"] = len(candidate_ids)
-    wa_blast_state["success_count"] = 0
-    wa_blast_state["failed_count"] = 0
-    wa_blast_state["logs"] = []
-    
-    # Run in background
-    t = threading.Thread(target=run_wa_blast_thread, args=(candidate_ids, template_msg, api_url, device_id))
-    t.daemon = True
-    t.start()
-    
-    return jsonify({"status": "success", "message": "WhatsApp blast initiated"})
+    # Try acquiring the lock. If locked, block concurrent call
+    if not wa_blast_lock.acquire(blocking=False):
+        return jsonify({"status": "error", "message": "WhatsApp blast queue is locked"}), 400
+        
+    try:
+        # Reset state
+        wa_blast_state["status"] = "sending"
+        wa_blast_state["current"] = 0
+        wa_blast_state["total"] = len(candidate_ids)
+        wa_blast_state["success_count"] = 0
+        wa_blast_state["failed_count"] = 0
+        wa_blast_state["logs"] = []
+        
+        # Run in background
+        t = threading.Thread(target=run_wa_blast_thread, args=(candidate_ids, template_msg, api_url, device_id))
+        t.daemon = True
+        t.start()
+        
+        return jsonify({"status": "success", "message": "WhatsApp blast initiated"})
+    except Exception as e:
+        try:
+            wa_blast_lock.release()
+        except RuntimeError:
+            pass
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/api/wa/blast/status', methods=['GET'])
 def api_wa_blast_status():
