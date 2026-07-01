@@ -175,19 +175,23 @@
                 <div class="applicants-section">
                     <div class="applicants-header">
                         <span id="candidates-count-label" class="candidates-count">Loading candidates...</span>
+                        <button id="btn-export-excel" onclick="exportExcel()" class="btn btn-secondary">
+                            <span class="material-icons" style="font-size: 1.1rem; margin-right: 6px; vertical-align: middle;">download</span>
+                            <span style="vertical-align: middle;">Export Excel</span>
+                        </button>
                     </div>
                     
                     <div class="table-container bezel-shell">
                         <table class="data-table">
                             <thead>
                                 <tr>
-                                    <th>Full Name</th>
-                                    <th>Academic Major</th>
-                                    <th>University</th>
-                                    <th>Phone Number</th>
-                                    <th>Email Address</th>
-                                    <th>Position</th>
-                                    <th>Status</th>
+                                    <th style="width: 20%;">Full Name</th>
+                                    <th style="width: 20%;">Academic Major</th>
+                                    <th style="width: 20%;">University</th>
+                                    <th style="width: 13%;">Phone Number</th>
+                                    <th style="width: 15%;">Email Address</th>
+                                    <th style="width: 12%;">Position</th>
+                                    <th style="width: 10%;">Status</th>
                                 </tr>
                             </thead>
                             <tbody id="applicants-table-body">
@@ -197,15 +201,17 @@
                             </tbody>
                         </table>
                     </div>
-                </div>
-                
-                <!-- Export Excel Area -->
-                <div class="panel panel-bordered export-card">
-                    <h5 class="panel-title">Export Interface</h5>
-                    <p>Download formatted Excel document containing the current filtered results. Columns included: <b>Nama</b>, <b>Nomor WA/HP</b>, and <b>Email</b>.</p>
-                    <button id="btn-export-excel" onclick="exportExcel()" class="btn btn-secondary">
-                        Download Excel File
-                    </button>
+
+                    <!-- Pagination Controls -->
+                    <div id="pagination-controls" class="pagination-container hidden">
+                        <button id="btn-prev-page" onclick="prevPage()" class="btn btn-secondary btn-icon">
+                            <span class="material-icons" style="font-size: 1.25rem;">chevron_left</span>
+                        </button>
+                        <span id="page-indicator" class="page-indicator">Page 1 of 1</span>
+                        <button id="btn-next-page" onclick="nextPage()" class="btn btn-secondary btn-icon">
+                            <span class="material-icons" style="font-size: 1.25rem;">chevron_right</span>
+                        </button>
+                    </div>
                 </div>
             </section>
             

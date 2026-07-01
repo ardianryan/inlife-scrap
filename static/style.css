@@ -78,6 +78,8 @@ h1, h2, h3, h4, h5, h6 {
     background-color: #ffffff;
     border-color: var(--border-input);
     color: var(--text-secondary);
+    padding: 8px 14px;
+    font-size: 0.88rem;
 }
 
 .btn-secondary:hover {
@@ -353,7 +355,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .view-panel {
-    max-width: 1100px;
+    max-width: 1200px;
     margin: 0 auto;
 }
 
@@ -509,7 +511,10 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .applicants-header {
-    margin-bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
 }
 
 .candidates-count {
@@ -528,20 +533,27 @@ h1, h2, h3, h4, h5, h6 {
     width: 100%;
     border-collapse: collapse;
     font-family: var(--font-body);
-    font-size: 0.9rem;
+    font-size: 0.88rem;
     background-color: var(--bg-card);
+    table-layout: fixed;
 }
 
 .data-table th, .data-table td {
-    padding: 14px 16px;
+    padding: 12px 16px;
     text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .data-table th {
-    background-color: #f8fafc;
+    background-color: #f1f5f9;
     font-weight: 700;
     color: var(--text-secondary);
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    text-transform: uppercase;
+    font-size: 0.76rem;
+    letter-spacing: 0.05em;
 }
 
 .data-table td {
@@ -549,8 +561,12 @@ h1, h2, h3, h4, h5, h6 {
     color: var(--text-primary);
 }
 
-.data-table tbody tr:hover {
+.data-table tbody tr:nth-child(even) {
     background-color: #f8fafc;
+}
+
+.data-table tbody tr:hover {
+    background-color: rgba(15, 23, 42, 0.02);
 }
 
 .table-placeholder {
@@ -559,13 +575,72 @@ h1, h2, h3, h4, h5, h6 {
     padding: 40px !important;
 }
 
+/* Semantically Colored Status Badges */
 .stage-badge {
     display: inline-flex;
-    padding: 3px 8px;
+    padding: 4px 10px;
     font-size: 0.72rem;
     font-weight: 700;
     border-radius: 4px;
-    background-color: #f1f5f9;
+    background-color: #e2e8f0;
+    color: #475569;
+    text-transform: uppercase;
+}
+
+.stage-badge.diterima, .stage-badge.lulus, .stage-badge.diterima_magang {
+    background-color: #dcfce7;
+    color: #15803d;
+}
+
+.stage-badge.ditolak, .stage-badge.gagal {
+    background-color: #fee2e2;
+    color: #b91c1c;
+}
+
+.stage-badge.interview, .stage-badge.wawancara {
+    background-color: #fef9c3;
+    color: #a16207;
+}
+
+.stage-badge.berkas, .stage-badge.administrasi, .stage-badge.seleksi_berkas {
+    background-color: #dbeafe;
+    color: #1d4ed8;
+}
+
+/* --- PAGINATION --- */
+.pagination-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+    margin-top: 22px;
+}
+
+.btn-icon {
+    padding: 0 !important;
+    border-radius: 50% !important;
+    width: 36px !important;
+    height: 36px !important;
+    background-color: #ffffff !important;
+    border: 1px solid var(--border-input) !important;
+    color: var(--text-secondary) !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02) !important;
+    transition: all 0.2s ease !important;
+}
+
+.btn-icon:hover:not(:disabled) {
+    background-color: var(--bg-page) !important;
+    border-color: rgba(0, 0, 0, 0.15) !important;
+}
+
+.btn-icon:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.page-indicator {
+    font-size: 0.88rem;
+    font-weight: 700;
     color: var(--text-secondary);
 }
 

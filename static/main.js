@@ -3,6 +3,11 @@
 const API_BASE = window.location.origin;
 let syncInterval = null;
 
+// --- PAGINATION STATE ---
+let allApplicants = [];
+let currentPage = 1;
+const rowsPerPage = 10;
+
 // --- INITIALIZATION & SESSION PERSISTENCE ---
 document.addEventListener("DOMContentLoaded", () => {
     // Check if user is already authenticated
@@ -206,34 +211,91 @@ async function loadApplicants() {
         if (position) url.searchParams.append("position", position);
         
         const response = await fetch(url);
-        const list = await response.json();
         
-        document.getElementById("candidates-count-label").innerHTML = `Found <b>${list.length}</b> candidates matching criteria.`;
-        tableBody.innerHTML = "";
+        // Save to global applicants array and reset page index
+        allApplicants = await response.json();
+        currentPage = 1;
         
-        if (list.length === 0) {
-            tableBody.innerHTML = '<tr><td colspan="7" class="table-placeholder">No matching candidate profiles found.</td></tr>';
-            return;
-        }
-        
-        list.forEach(c => {
-            const stage = c.tahap ? c.tahap.toUpperCase() : "-";
-            const rowHTML = `
-                <tr>
-                    <td style="font-weight: 700; color: #0f172a;">${c.name}</td>
-                    <td>${c.major}</td>
-                    <td>${c.university}</td>
-                    <td>${c.phone_number || "-"}</td>
-                    <td>${c.email || "-"}</td>
-                    <td>${c.position_title}</td>
-                    <td><span class="stage-badge">${stage}</span></td>
-                </tr>
-            `;
-            tableBody.insertAdjacentHTML("beforeend", rowHTML);
-        });
+        displayApplicants();
         
     } catch (e) {
         tableBody.innerHTML = '<tr><td colspan="7" class="table-placeholder" style="color: #dc2626;">Error retrieving data records.</td></tr>';
+    }
+}
+
+function displayApplicants() {
+    const tableBody = document.getElementById("applicants-table-body");
+    const countLabel = document.getElementById("candidates-count-label");
+    const pagControls = document.getElementById("pagination-controls");
+    
+    countLabel.innerHTML = `Found <b>${allApplicants.length}</b> candidates matching criteria.`;
+    tableBody.innerHTML = "";
+    
+    if (allApplicants.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="7" class="table-placeholder">No matching candidate profiles found.</td></tr>';
+        pagControls.classList.add("hidden");
+        return;
+    }
+    
+    // Calculate Slicing
+    const totalPages = Math.ceil(allApplicants.length / rowsPerPage);
+    const start = (currentPage - 1) * rowsPerPage;
+    const end = Math.min(start + rowsPerPage, allApplicants.length);
+    const pageItems = allApplicants.slice(start, end);
+    
+    pageItems.forEach(c => {
+        const rawStage = c.tahap ? c.tahap.toUpperCase() : "";
+        const displayStage = c.tahap ? c.tahap.toUpperCase() : "-";
+        
+        // Map status style classes semantically
+        let badgeClass = "";
+        if (rawStage.includes("DITERIMA") || rawStage.includes("LULUS") || rawStage.includes("SUCCESS")) {
+            badgeClass = "diterima";
+        } else if (rawStage.includes("DITOLAK") || rawStage.includes("GAGAL") || rawStage.includes("FAIL")) {
+            badgeClass = "ditolak";
+        } else if (rawStage.includes("INTERVIEW") || rawStage.includes("WAWANCARA")) {
+            badgeClass = "interview";
+        } else if (rawStage.includes("BERKAS") || rawStage.includes("ADMINISTRASI") || rawStage.includes("SELEKSI")) {
+            badgeClass = "berkas";
+        }
+        
+        const rowHTML = `
+            <tr>
+                <td style="font-weight: 700; color: #0f172a;" title="${c.name}">${c.name}</td>
+                <td title="${c.major}">${c.major}</td>
+                <td title="${c.university}">${c.university}</td>
+                <td title="${c.phone_number || "-"}">${c.phone_number || "-"}</td>
+                <td title="${c.email || "-"}">${c.email || "-"}</td>
+                <td title="${c.position_title}">${c.position_title}</td>
+                <td><span class="stage-badge ${badgeClass}">${displayStage}</span></td>
+            </tr>
+        `;
+        tableBody.insertAdjacentHTML("beforeend", rowHTML);
+    });
+    
+    // Configure pagination panel visibility
+    if (allApplicants.length > rowsPerPage) {
+        pagControls.classList.remove("hidden");
+        document.getElementById("page-indicator").textContent = `Page ${currentPage} of ${totalPages}`;
+        document.getElementById("btn-prev-page").disabled = currentPage === 1;
+        document.getElementById("btn-next-page").disabled = currentPage === totalPages;
+    } else {
+        pagControls.classList.add("hidden");
+    }
+}
+
+function prevPage() {
+    if (currentPage > 1) {
+        currentPage--;
+        displayApplicants();
+    }
+}
+
+function nextPage() {
+    const totalPages = Math.ceil(allApplicants.length / rowsPerPage);
+    if (currentPage < totalPages) {
+        currentPage++;
+        displayApplicants();
     }
 }
 
