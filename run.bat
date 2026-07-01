@@ -88,8 +88,14 @@ echo Installing dependencies...
 python -m pip install --upgrade pip
 pip install -r requirements.txt
 
-:: Run Streamlit app
+:: Run Streamlit app as Desktop App (with Web browser fallback)
 echo.
-echo Launching console...
-python -m streamlit run app.py --browser.gatherUsageStats false
+echo Launching Scraper Console...
+python desktop.py
+if %errorlevel% neq 0 (
+    echo.
+    echo Desktop window engine not supported on this PC.
+    echo Launching in web browser fallback mode...
+    python -m streamlit run app.py --browser.gatherUsageStats false
+)
 pause

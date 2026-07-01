@@ -27,6 +27,6 @@ echo "Installing dependencies..."
 pip install --upgrade pip
 pip install -r requirements.txt
 
-# Run Streamlit app
-echo "Launching console..."
-python3 -m streamlit run app.py --browser.gatherUsageStats false
+# Run Desktop app wrapper with web browser fallback
+echo "Launching Scraper Console..."
+python desktop.py || python3 -m streamlit run app.py --browser.gatherUsageStats false
