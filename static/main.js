@@ -305,13 +305,23 @@ function exportExcel() {
     const major = document.getElementById("filter-major").value;
     const position = document.getElementById("filter-position").value;
     
-    const url = new URL(`${API_BASE}/api/export`);
-    if (search) url.searchParams.append("search", search);
-    if (major) url.searchParams.append("major", major);
-    if (position) url.searchParams.append("position", position);
-    
-    // Redirect browser window to trigger server file stream download
-    window.location.href = url.toString();
+    // Check if running inside the native Desktop PyWebview wrapper
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.download_excel) {
+        window.pywebview.api.download_excel(search, position, major).then(response => {
+            if (response.status === "success") {
+                alert(`Excel file successfully saved to:\n${response.path}`);
+            } else if (response.status === "error") {
+                alert(`Error saving file: ${response.message}`);
+            }
+        });
+    } else {
+        // Fallback for standard browsers
+        const url = new URL(`${API_BASE}/api/export`);
+        if (search) url.searchParams.append("search", search);
+        if (major) url.searchParams.append("major", major);
+        if (position) url.searchParams.append("position", position);
+        window.location.href = url.toString();
+    }
 }
 
 // --- SYNC SECTION ---
