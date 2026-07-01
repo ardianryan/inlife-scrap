@@ -1,7 +1,6 @@
 import subprocess
 import time
 import webview
-import threading
 import sys
 import socket
 import os
@@ -27,30 +26,45 @@ def start_streamlit(port):
         "--browser.gatherUsageStats", "false"
     ]
     
-    # Jalankan subprocess
-    subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    # Jalankan subprocess dan kembalikan referensi prosesnya
+    return subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 if __name__ == '__main__':
     # 1. Cari port dinamis yang kosong
     port = find_free_port()
     
-    # 2. Jalankan Streamlit server di thread latar belakang
-    t = threading.Thread(target=start_streamlit, args=(port,))
-    t.daemon = True
-    t.start()
+    # 2. Jalankan Streamlit server
+    process = start_streamlit(port)
     
     # 3. Beri jeda 3 detik agar server Streamlit siap memuat halaman
     time.sleep(3)
     
-    # 4. Buat dan buka jendela aplikasi desktop mandiri pointing ke localhost
-    # session=authenticated ditambahkan agar otomatis terhubung jika sesi tersimpan
-    webview.create_window(
-        title='Internship Scraper Console', 
-        url=f'http://localhost:{port}/?session=authenticated',
-        width=1280, 
-        height=800,
-        resizable=True
-    )
-    
-    # Mulai UI window desktop
-    webview.start()
+    try:
+        # 4. Buat dan buka jendela aplikasi desktop mandiri
+        webview.create_window(
+            title='Internship Scraper Console', 
+            url=f'http://localhost:{port}/?session=authenticated',
+            width=1280, 
+            height=800,
+            resizable=True
+        )
+        
+        # Mulai UI window desktop (akan memblokir eksekusi di sini hingga jendela ditutup)
+        webview.start()
+        
+    finally:
+        # Bagian ini AKAN SELALU dijalankan saat jendela aplikasi desktop ditutup
+        print("Menghentikan server Streamlit di latar belakang...")
+        if process:
+            try:
+                # Kirim sinyal pemberhentian ke subprocess
+                process.terminate()
+                # Tunggu maksimal 2 detik untuk keluar secara rapi
+                process.wait(timeout=2)
+            except Exception:
+                try:
+                    # Paksa matikan jika terminate gagal/tergantung
+                    process.kill()
+                except Exception:
+                    pass
+            print("Server Streamlit berhasil dihentikan.")
