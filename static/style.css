@@ -535,6 +535,8 @@ h1, h2, h3, h4, h5, h6 {
 
 .table-container {
     overflow-x: auto;
+    overflow-y: auto;
+    max-height: 520px;
     width: 100%;
     margin-bottom: 15px;
 }
@@ -557,6 +559,9 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .data-table th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
     background-color: #f1f5f9;
     font-weight: 700;
     color: var(--text-secondary);
