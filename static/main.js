@@ -7,7 +7,7 @@ let blastInterval = null;
 // --- PAGINATION & SELECTION STATE ---
 let allApplicants = [];
 let currentPage = 1;
-const rowsPerPage = 10;
+let rowsPerPage = 10;
 let selectedCandidateIds = [];
 let currentWaTemplate = "";
 
