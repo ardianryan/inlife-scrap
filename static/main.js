@@ -289,8 +289,15 @@ function displayApplicants() {
         tableBody.insertAdjacentHTML("beforeend", rowHTML);
     });
     
-    // Set status of Select All checkbox
-    document.getElementById("check-all-candidates").checked = allOnPageChecked && pageItems.length > 0;
+    // Set status of Select All checkbox (global across all pages)
+    let allChecked = allApplicants.length > 0;
+    for (let i = 0; i < allApplicants.length; i++) {
+        if (!selectedCandidateIds.includes(allApplicants[i].id)) {
+            allChecked = false;
+            break;
+        }
+    }
+    document.getElementById("check-all-candidates").checked = allChecked;
     
     // Configure pagination panel visibility
     if (allApplicants.length > rowsPerPage) {
@@ -333,12 +340,7 @@ function handleCandidateSelect(checkbox, id) {
 function toggleSelectAllCandidates() {
     const isChecked = document.getElementById("check-all-candidates").checked;
     
-    // Calculate current page slice
-    const start = (currentPage - 1) * rowsPerPage;
-    const end = Math.min(start + rowsPerPage, allApplicants.length);
-    const pageItems = allApplicants.slice(start, end);
-    
-    pageItems.forEach(c => {
+    allApplicants.forEach(c => {
         if (isChecked) {
             if (!selectedCandidateIds.includes(c.id)) {
                 selectedCandidateIds.push(c.id);
