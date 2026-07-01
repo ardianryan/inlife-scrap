@@ -888,22 +888,34 @@ async function fetchGowaDevices(savedDeviceIdsStr = "") {
         const response = await fetch(`${API_BASE}/api/wa/devices`);
         const json = await response.json();
         
-        if (json && json.status && json.data && json.data.length > 0) {
+        // GOWA v8.9.0 lists devices in "results" (v7 lists in "data")
+        const list = json.results || json.data || [];
+        const isSuccess = json.status !== false && json.code !== "ERROR";
+        
+        if (isSuccess && list.length > 0) {
             container.innerHTML = "";
-            json.data.forEach(dev => {
-                const devId = dev.device_id;
+            list.forEach(dev => {
+                // Support both GOWA schema properties (v7 and v8)
+                const devId = dev.id || dev.device_id || "default";
+                const devState = dev.state || dev.status || "offline";
+                const devName = dev.display_name || dev.name || "Unnamed Device";
+                
                 const isChecked = savedIds.includes(devId) || (savedIds.length === 0 && devId === "default");
-                const badgeColor = dev.status === "connected" ? "#22c55e" : "#ef4444";
+                const isConnected = devState === "connected" || devState === "logged_in";
+                const badgeColor = isConnected ? "#22c55e" : "#ef4444";
+                const displayState = devState === "logged_in" ? "connected" : devState;
+                
+                const displayJid = dev.jid ? ` (${dev.jid.split('@')[0]})` : "";
                 
                 const itemHTML = `
                     <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.88rem; font-weight: 600; color: var(--text-primary);">
                         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none;">
                             <input type="checkbox" name="wa-device-checkbox" value="${devId}" ${isChecked ? "checked" : ""} style="cursor: pointer;">
-                            <span style="font-weight: 700;">${dev.name || "Unnamed Device"}</span>
-                            <span style="color: var(--text-secondary); font-size: 0.8rem; font-weight: 500;">(${devId.split('@')[0]})</span>
+                            <span style="font-weight: 700;">${devName}</span>
+                            <span style="color: var(--text-secondary); font-size: 0.8rem; font-weight: 500;">${displayJid || `(${devId})`}</span>
                         </label>
                         <span style="font-size: 0.75rem; font-weight: 700; padding: 2px 8px; border-radius: 100px; background-color: ${badgeColor}15; color: ${badgeColor}; border: 1px solid ${badgeColor}30;">
-                            ${dev.status || "offline"}
+                            ${displayState}
                         </span>
                     </div>
                 `;
