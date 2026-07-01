@@ -310,6 +310,14 @@ function prevPage() {
     }
 }
 
+function nextPage() {
+    const totalPages = Math.ceil(allApplicants.length / rowsPerPage);
+    if (currentPage < totalPages) {
+        currentPage++;
+        displayApplicants();
+    }
+}
+
 // --- CHECKBOX SELECTION HANDLING ---
 function handleCandidateSelect(checkbox, id) {
     if (checkbox.checked) {
