@@ -481,12 +481,15 @@ if __name__ == '__main__':
     # Initialize DB schema
     init_db()
     
-    # Try starting GOWA background service
-    try:
-        import gowa_manager
-        gowa_manager.start_gowa()
-    except Exception as e:
-        print("[App] Failed to start GOWA manager:", str(e))
+    # Start GOWA background service asynchronously to prevent blocking Flask boot
+    def start_gowa_async():
+        try:
+            import gowa_manager
+            gowa_manager.start_gowa()
+        except Exception as e:
+            print("[App] Failed to start GOWA manager:", str(e))
+            
+    threading.Thread(target=start_gowa_async, daemon=True).start()
         
     port = int(os.environ.get("PORT", 5000))
     app.run(host='127.0.0.1', port=port, debug=False)
