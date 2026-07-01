@@ -20,11 +20,9 @@ st.set_page_config(
 init_db()
 
 # --- CACHED NETWORK STATUS CHECKER ---
-# Cache the check for 10 seconds to keep UI responsive and fast
 @st.cache_data(ttl=10)
 def check_online():
     try:
-        # Use HEAD request for maximum speed
         requests.head("https://apply.inlifesurabaya.com/login", timeout=1.5)
         return True
     except requests.RequestException:
@@ -213,13 +211,24 @@ st.markdown("""
         color: #64748b;
     }
     
-    /* Sidebar logout button */
-    section[data-testid="stSidebar"] button {
-        text-align: left !important;
-        justify-content: flex-start !important;
+    /* Sidebar logout button - Clean Crimson Red */
+    section[data-testid="stSidebar"] .stButton button {
+        background-color: rgba(239, 68, 68, 0.08) !important;
+        border: 1px solid rgba(239, 68, 68, 0.15) !important;
+        color: #dc2626 !important;
+        width: 100% !important;
+        font-weight: 600 !important;
         border-radius: 6px !important;
         padding: 8px 12px !important;
         font-size: 0.9rem !important;
+        transition: all 0.2s ease !important;
+        text-align: center !important;
+        justify-content: center !important;
+    }
+    section[data-testid="stSidebar"] .stButton button:hover {
+        background-color: #dc2626 !important;
+        border-color: #dc2626 !important;
+        color: #ffffff !important;
     }
     
     /* Input custom overrides */
@@ -352,7 +361,7 @@ with st.sidebar:
     
     st.markdown("<div style='height: 15px;'></div>", unsafe_allow_html=True)
     
-    # Custom HTML Sidebar Navigation Links
+    # --- Navigation Section ---
     st.markdown("### Navigation")
     
     active_dash = "active" if st.session_state.current_page == "Dashboard" else ""
@@ -378,30 +387,30 @@ with st.sidebar:
     
     st.markdown("<hr style='margin: 15px 0; border:0; border-top:1px solid rgba(0,0,0,0.06);'>", unsafe_allow_html=True)
     
-    st.markdown("### Connection")
-    if is_online:
-        st.markdown("Status: **🟢 Online**")
-    else:
-        st.markdown("Status: **🔴 Offline** (Sync Locked)")
-        
-    st.markdown("<hr style='margin: 15px 0; border:0; border-top:1px solid rgba(0,0,0,0.06);'>", unsafe_allow_html=True)
+    # --- System Info Section ---
+    st.markdown("### System Info")
     
-    st.markdown("### User Session")
-    st.markdown("Role: **Administrator**")
+    status_label = "Online" if is_online else "Offline"
+    status_icon = "🟢" if is_online else "🔴"
     
-    # Logout button
+    st.markdown(f"""
+    <div style="font-size: 0.88rem; line-height: 1.6; color: #475569; font-family: 'Plus Jakarta Sans', sans-serif;">
+        <div style="margin-bottom: 4px;">Connection: <span style="font-weight: 700; color: #0f172a;">{status_icon} {status_label}</span></div>
+        <div style="margin-bottom: 4px;">Database: <span style="font-weight: 700; color: #0f172a;">interns.db</span></div>
+        <div style="margin-bottom: 4px;">Size: <span style="font-weight: 700; color: #0f172a;">{db_size_kb:.1f} KB</span></div>
+        <div style="margin-bottom: 4px;">Session: <span style="font-weight: 700; color: #0f172a;">Administrator</span></div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Spacer to push logout to the very bottom
+    st.markdown("<div style='height: 140px;'></div>", unsafe_allow_html=True)
+    
+    # Logout button (Styled standard Crimson Red)
     logout_clicked = st.button("Logout", use_container_width=True, key="sidebar_logout")
     if logout_clicked:
         st.session_state.authenticated = False
         st.query_params.clear()
         st.rerun()
-        
-    st.markdown("<hr style='margin: 15px 0; border:0; border-top:1px solid rgba(0,0,0,0.06);'>", unsafe_allow_html=True)
-    
-    st.markdown("### Local Storage")
-    st.markdown(f"**Database:** `interns.db`  \n"
-                f"**Size:** `{db_size_kb:.1f} KB`  \n"
-                f"**Connection:** {'Connected' if db_exists else 'Disconnected'}")
 
 # Render Pages based on Sidebar selection
 # ----------------- PAGE 1: DASHBOARD & EXPORT -----------------
