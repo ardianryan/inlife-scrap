@@ -282,8 +282,9 @@ function displayApplicants() {
             badgeClass = "berkas";
         }
         
-        // Construct wa.me link with customized template message
-        let phoneCellHTML = "-";
+        // Construct wa.me link with customized template message in its own dedicated column
+        let phoneCellHTML = c.phone_number || "-";
+        let waCellHTML = "-";
         if (c.phone_number) {
             let cleanPhone = c.phone_number.replace(/\D/g, "");
             if (cleanPhone.startsWith("0")) {
@@ -299,13 +300,10 @@ function displayApplicants() {
             const encodedMsg = encodeURIComponent(msg);
             const waMeUrl = `https://wa.me/${cleanPhone}?text=${encodedMsg}`;
             
-            phoneCellHTML = `
-                <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px;">
-                    <span title="${c.phone_number}">${c.phone_number}</span>
-                    <a href="${waMeUrl}" target="_blank" class="wa-quick-link" title="Kirim pesan langsung lewat WhatsApp Web/App" style="color: #22c55e; display: inline-flex; align-items: center; text-decoration: none;">
-                        <span class="material-icons" style="font-size: 1.15rem;">chat</span>
-                    </a>
-                </div>
+            waCellHTML = `
+                <a href="${waMeUrl}" target="_blank" class="wa-quick-link" title="Kirim pesan langsung lewat WhatsApp Web/App" style="color: #22c55e; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; width: 100%;">
+                    <span class="material-icons" style="font-size: 1.25rem;">chat</span>
+                </a>
             `;
         }
         
@@ -317,7 +315,8 @@ function displayApplicants() {
                 <td style="font-weight: 700; color: #0f172a;" title="${c.name}">${c.name}</td>
                 <td title="${c.major}">${c.major}</td>
                 <td title="${c.university}">${c.university}</td>
-                <td>${phoneCellHTML}</td>
+                <td title="${c.phone_number || "-"}">${phoneCellHTML}</td>
+                <td style="text-align: center;">${waCellHTML}</td>
                 <td title="${c.email || "-"}">${c.email || "-"}</td>
                 <td title="${c.position_title}">${c.position_title}</td>
                 <td><span class="stage-badge ${badgeClass}">${displayStage}</span></td>
