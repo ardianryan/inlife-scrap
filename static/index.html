@@ -175,28 +175,37 @@
                 <div class="applicants-section">
                     <div class="applicants-header">
                         <span id="candidates-count-label" class="candidates-count">Loading candidates...</span>
-                        <button id="btn-export-excel" onclick="exportExcel()" class="btn btn-secondary">
-                            <span class="material-icons" style="font-size: 1.1rem; margin-right: 6px; vertical-align: middle;">download</span>
-                            <span style="vertical-align: middle;">Export Excel</span>
-                        </button>
+                        <div class="header-actions">
+                            <button id="btn-open-blast" onclick="openBlastModal()" class="btn btn-primary" style="margin-right: 8px;" disabled>
+                                <span class="material-icons" style="font-size: 1.1rem; margin-right: 6px; vertical-align: middle;">chat</span>
+                                <span style="vertical-align: middle;">Blast WA</span>
+                            </button>
+                            <button id="btn-export-excel" onclick="exportExcel()" class="btn btn-secondary">
+                                <span class="material-icons" style="font-size: 1.1rem; margin-right: 6px; vertical-align: middle;">download</span>
+                                <span style="vertical-align: middle;">Export Excel</span>
+                            </button>
+                        </div>
                     </div>
                     
                     <div class="table-container bezel-shell">
                         <table class="data-table">
                             <thead>
                                 <tr>
-                                    <th style="width: 20%;">Full Name</th>
-                                    <th style="width: 20%;">Academic Major</th>
-                                    <th style="width: 20%;">University</th>
+                                    <th style="width: 5%; text-align: center;">
+                                        <input type="checkbox" id="check-all-candidates" onchange="toggleSelectAllCandidates()">
+                                    </th>
+                                    <th style="width: 18%;">Full Name</th>
+                                    <th style="width: 18%;">Academic Major</th>
+                                    <th style="width: 18%;">University</th>
                                     <th style="width: 13%;">Phone Number</th>
-                                    <th style="width: 15%;">Email Address</th>
+                                    <th style="width: 14%;">Email Address</th>
                                     <th style="width: 12%;">Position</th>
                                     <th style="width: 10%;">Status</th>
                                 </tr>
                             </thead>
                             <tbody id="applicants-table-body">
                                 <tr>
-                                    <td colspan="7" class="table-placeholder">Loading applicants records...</td>
+                                    <td colspan="8" class="table-placeholder">Loading applicants records...</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -256,6 +265,7 @@
                     <p class="brand-desc">Configure authentication credentials and manage local database operations.</p>
                 </div>
                 
+                <!-- Mentor credentials form -->
                 <div class="panel panel-bordered">
                     <h5 class="panel-title">Mentor Portal Credentials</h5>
                     <form id="settings-form" onsubmit="saveSettings(event)">
@@ -267,10 +277,47 @@
                             <label for="settings-password">Account Password</label>
                             <input type="password" id="settings-password" required placeholder="Enter password...">
                         </div>
-                        <button type="submit" class="btn btn-primary">Save Settings</button>
+                        <button type="submit" class="btn btn-primary">Save Credentials</button>
                     </form>
                 </div>
                 
+                <!-- WhatsApp settings form -->
+                <div class="panel panel-bordered" style="margin-top: 25px;">
+                    <h5 class="panel-title">WhatsApp GOWA Settings (Unofficial API)</h5>
+                    <form id="wa-settings-form" onsubmit="saveWaSettings(event)">
+                        <div class="input-group">
+                            <label for="settings-wa-url">GOWA Server API Base URL</label>
+                            <input type="url" id="settings-wa-url" required placeholder="e.g. http://localhost:3000">
+                        </div>
+                        <div class="input-group">
+                            <label for="settings-wa-device">WhatsApp Device ID</label>
+                            <input type="text" id="settings-wa-device" required placeholder="e.g. default">
+                        </div>
+                        <div class="input-group">
+                            <label for="settings-wa-template">Default Message Template</label>
+                            <textarea id="settings-wa-template" rows="6" style="width:100%; font-family:inherit; padding:10px; border-radius:6px; border:1px solid var(--border-input); outline:none; resize:vertical;" placeholder="Write template text here..."></textarea>
+                            <div style="font-size:0.78rem; color:var(--text-muted); margin-top:5px; line-height:1.4;">
+                                Available dynamic merge tags: <b>{{nama}}</b> (pelamar), <b>{{posisi}}</b> (posisi magang), <b>{{kampus}}</b> (universitas).
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary" style="margin-bottom: 20px;">Save WhatsApp Settings</button>
+                    </form>
+
+                    <!-- Connection Testing Sub-Panel -->
+                    <div style="border-top: 1px solid var(--border-color); padding-top: 20px;">
+                        <h5 class="panel-title" style="font-size: 0.95rem; margin-bottom: 12px;">Test Connection / Send Test Message</h5>
+                        <div class="input-group">
+                            <label for="settings-wa-test-phone">Test Recipient Phone Number (Your WA Number)</label>
+                            <input type="text" id="settings-wa-test-phone" placeholder="e.g. 08123456789">
+                        </div>
+                        <button type="button" onclick="sendTestWaMessage()" id="btn-send-test-wa" class="btn btn-secondary">
+                            <span class="material-icons" style="font-size: 1.1rem; margin-right: 6px; vertical-align: middle;">send</span>
+                            <span style="vertical-align: middle;">Send Test Message</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Database Cache operations -->
                 <div class="panel panel-bordered" style="margin-top: 25px;">
                     <h5 class="panel-title">Cache Maintenance</h5>
                     <p>Wipe cached records from the database table. This action does not affect credentials.</p>
@@ -284,6 +331,60 @@
                 </div>
             </section>
         </main>
+    </div>
+
+    <!-- --- WHATSAPP BLAST MODAL OVERLAY --- -->
+    <div id="blast-modal" class="modal-overlay hidden">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h2>WhatsApp Broadcast Blast</h2>
+                <button onclick="closeBlastModal()" class="btn-close-modal">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            
+            <div class="modal-body">
+                <div class="recipient-badge">
+                    Recipients: <b id="blast-recipient-count">0</b> candidates selected.
+                </div>
+                
+                <div class="input-group" style="margin-top: 15px;">
+                    <label for="blast-template-text">Compile Broadcast Message</label>
+                    <textarea id="blast-template-text" rows="8" style="width:100%; font-family:inherit; padding:10px; border-radius:6px; border:1px solid var(--border-input); outline:none; resize:vertical;"></textarea>
+                    <div style="font-size:0.78rem; color:var(--text-muted); margin-top:5px; line-height:1.4;">
+                        Merge Tags: <b>{{nama}}</b> (nama), <b>{{posisi}}</b> (posisi), <b>{{kampus}}</b> (kampus).
+                    </div>
+                </div>
+                
+                <!-- Active Broadcast Progress -->
+                <div id="blast-progress-section" class="progress-area hidden" style="margin-top:20px; margin-bottom:15px;">
+                    <div class="progress-labels" style="font-size:0.85rem; font-weight:700; margin-bottom: 4px;">
+                        <span id="blast-progress-text">Sending broadcast: 0/0</span>
+                        <span id="blast-progress-percent">0%</span>
+                    </div>
+                    <div class="progress-bar-bg" style="height:8px;">
+                        <div id="blast-progress-bar" class="progress-bar-fill" style="width:0%; height:8px;"></div>
+                    </div>
+                    <div style="font-size:0.8rem; font-weight:600; color:var(--text-secondary); margin-top:8px; display:flex; gap:15px;">
+                        <span>Success: <b id="blast-success-label" style="color:#166534;">0</b></span>
+                        <span>Failed: <b id="blast-failed-label" style="color:#b91c1c;">0</b></span>
+                    </div>
+                </div>
+                
+                <div class="console-label" style="margin-top:15px;">Broadcast log stream:</div>
+                <div id="blast-console-logs" class="console-box" style="max-height:140px; background-color:#f8fafc; font-family:monospace; font-size:0.8rem; padding:10px; border-radius:6px; border:1px solid var(--border-color); overflow-y:auto; line-height: 1.5;">
+                    <div style="color:var(--text-muted);">Console ready. Press "Send Broadcast" to start.</div>
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <button onclick="closeBlastModal()" id="btn-cancel-blast" class="btn btn-secondary">Cancel</button>
+                <button onclick="startWaBlast()" id="btn-send-blast" class="btn btn-primary">
+                    <span class="material-icons" style="font-size: 1.1rem; margin-right: 6px; vertical-align: middle;">send</span>
+                    <span style="vertical-align: middle;">Send Broadcast</span>
+                </button>
+            </div>
+        </div>
     </div>
 
     <!-- Core Javascript Code -->

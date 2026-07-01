@@ -4,20 +4,29 @@ import sqlite3
 import os
 import io
 import threading
-import pandas as pd
+import time
+import requests
 from datetime import datetime
 from db import init_db, save_applicant, get_applicants, get_positions, get_majors, get_stats, DB_PATH, get_setting, set_setting
-from scraper import scrape_generator
 
 # Initialize Flask app serving from static directory
 app = Flask(__name__, static_folder='static')
-CORS(app)  # Enable CORS for all routes (useful for Webview wrapper calls)
+CORS(app)  # Enable CORS for all routes
 
-# Global dictionary to manage real-time scraper thread status
+# Global dicts to manage real-time background threads status
 sync_state = {
     "status": "idle",  # "idle", "running", "complete", "error"
     "current": 0,
     "total": 0,
+    "logs": []
+}
+
+wa_blast_state = {
+    "status": "idle",  # "idle", "sending", "complete", "error"
+    "current": 0,
+    "total": 0,
+    "success_count": 0,
+    "failed_count": 0,
     "logs": []
 }
 
@@ -95,22 +104,53 @@ def api_applicants():
 
 @app.route('/api/settings', methods=['GET', 'POST'])
 def api_settings():
-    """Handles retrieval and update of Inlife mentor credentials in SQLite settings."""
+    """Handles retrieval and update of credentials and WhatsApp GOWA configs."""
+    default_template = (
+        "Halo {{nama}},\n\n"
+        "Selamat! Anda dinyatakan lolos seleksi berkas untuk posisi {{posisi}} di Inlife Surabaya.\n\n"
+        "Harap membalas pesan ini untuk konfirmasi kehadiran sesi interview.\n\n"
+        "Terima kasih."
+    )
+    
     if request.method == 'GET':
         email = get_setting("mentor_email", "newgen@gmail.com")
         password = get_setting("mentor_password", "Tapfya88")
-        return jsonify({"mentor_email": email, "mentor_password": password})
+        wa_api_url = get_setting("wa_api_url", "http://localhost:3000")
+        wa_device_id = get_setting("wa_device_id", "default")
+        wa_template = get_setting("wa_template", default_template)
+        wa_test_phone = get_setting("wa_test_phone", "")
+        
+        return jsonify({
+            "mentor_email": email,
+            "mentor_password": password,
+            "wa_api_url": wa_api_url,
+            "wa_device_id": wa_device_id,
+            "wa_template": wa_template,
+            "wa_test_phone": wa_test_phone
+        })
     
     # POST request
     data = request.json or {}
     email = data.get("mentor_email")
     password = data.get("mentor_password")
+    wa_api_url = data.get("wa_api_url")
+    wa_device_id = data.get("wa_device_id")
+    wa_template = data.get("wa_template")
+    wa_test_phone = data.get("wa_test_phone")
     
-    if not email or not password:
-        return jsonify({"status": "error", "message": "Email and password cannot be empty"}), 400
+    if email:
+        set_setting("mentor_email", email)
+    if password:
+        set_setting("mentor_password", password)
+    if wa_api_url:
+        set_setting("wa_api_url", wa_api_url)
+    if wa_device_id:
+        set_setting("wa_device_id", wa_device_id)
+    if wa_template:
+        set_setting("wa_template", wa_template)
+    if wa_test_phone is not None:
+        set_setting("wa_test_phone", wa_test_phone)
         
-    set_setting("mentor_email", email)
-    set_setting("mentor_password", password)
     return jsonify({"status": "success", "message": "Settings saved successfully"})
 
 @app.route('/api/clear', methods=['POST'])
@@ -132,6 +172,7 @@ def run_sync_thread(email, password):
     """Background worker thread to run scraper generator and update sync state."""
     global sync_state
     try:
+        from scraper import scrape_generator
         sync_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] Initializing synchronization...")
         for event in scrape_generator(email, password):
             if event["type"] == "status":
@@ -168,7 +209,6 @@ def api_sync():
     sync_state["total"] = 0
     sync_state["logs"] = []
     
-    # Fire thread
     t = threading.Thread(target=run_sync_thread, args=(email, password))
     t.daemon = True
     t.start()
@@ -180,6 +220,177 @@ def api_sync_status():
     """Returns the current background scraping logs, counts, and status."""
     global sync_state
     return jsonify(sync_state)
+
+# --- BACKGROUND WHATSAPP BLAST MANAGEMENT ---
+
+def clean_phone_number(phone):
+    """Sanitizes Indonesian phone numbers into standardized WhatsApp JID JID format."""
+    if not phone:
+        return None
+    # Strip all non-digits
+    cleaned = "".join(c for c in str(phone) if c.isdigit())
+    if cleaned.startswith("0"):
+        cleaned = "62" + cleaned[1:]
+    if not cleaned.endswith("@s.whatsapp.net"):
+        cleaned = cleaned + "@s.whatsapp.net"
+    return cleaned
+
+def run_wa_blast_thread(candidate_ids, template_msg, api_url, device_id):
+    """Worker thread that formats messages and sends them to the local GOWA API."""
+    global wa_blast_state
+    try:
+        wa_blast_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] Memulai pengiriman blast WhatsApp ke {len(candidate_ids)} pelamar...")
+        
+        # Connect to SQLite
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+        
+        for idx, cid in enumerate(candidate_ids):
+            wa_blast_state["current"] = idx + 1
+            
+            c.execute("SELECT name, position_title, university, phone_number FROM applicants WHERE id = ?", (cid,))
+            row = c.fetchone()
+            if not row:
+                wa_blast_state["failed_count"] += 1
+                wa_blast_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] GAGAL: Kandidat dengan ID {cid} tidak ditemukan di database.")
+                continue
+                
+            name = row["name"]
+            position = row["position_title"]
+            university = row["university"]
+            phone = row["phone_number"]
+            
+            # Format message template variables
+            msg = template_msg
+            msg = msg.replace("{{nama}}", name).replace("{{Nama}}", name)
+            msg = msg.replace("{{posisi}}", position).replace("{{Posisi}}", position)
+            msg = msg.replace("{{kampus}}", university).replace("{{Kampus}}", university).replace("{{universitas}}", university)
+            
+            # Clean JID phone format
+            jid = clean_phone_number(phone)
+            if not jid:
+                wa_blast_state["failed_count"] += 1
+                wa_blast_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] GAGAL: Nomor telepon pelamar {name} kosong.")
+                continue
+                
+            # Endpoint GOWA
+            url = f"{api_url.rstrip('/')}/send/message"
+            headers = {"Content-Type": "application/json"}
+            if device_id and device_id.strip() != "":
+                headers["X-Device-Id"] = device_id
+                
+            payload = {
+                "phone": jid,
+                "message": msg
+            }
+            
+            try:
+                # Trigger call to GOWA
+                res = requests.post(url, json=payload, headers=headers, timeout=7)
+                if res.status_code in [200, 201]:
+                    wa_blast_state["success_count"] += 1
+                    wa_blast_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] BERHASIL: Pesan dikirim ke {name} ({phone})")
+                else:
+                    wa_blast_state["failed_count"] += 1
+                    wa_blast_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] GAGAL: {name} ({phone}) - HTTP {res.status_code}: {res.text}")
+            except Exception as err:
+                wa_blast_state["failed_count"] += 1
+                wa_blast_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] GAGAL: {name} ({phone}) - Error koneksi: {str(err)}")
+                
+            # Jeda minimal 5 detik untuk menghindari deteksi spam / blokir
+            time.sleep(5)
+            
+        conn.close()
+        wa_blast_state["status"] = "complete"
+        wa_blast_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] Broadcast selesai! Terkirim: {wa_blast_state['success_count']}, Gagal: {wa_blast_state['failed_count']}.")
+        
+    except Exception as e:
+        wa_blast_state["status"] = "error"
+        wa_blast_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] FATAL ERROR: {str(e)}")
+
+@app.route('/api/wa/blast', methods=['POST'])
+def api_wa_blast():
+    """Triggers background WhatsApp broadcast thread."""
+    global wa_blast_state
+    if wa_blast_state["status"] == "sending":
+        return jsonify({"status": "error", "message": "WhatsApp blast is already running"}), 400
+        
+    data = request.json or {}
+    candidate_ids = data.get("candidate_ids", [])
+    template_msg = data.get("message_template", "")
+    
+    if not candidate_ids:
+        return jsonify({"status": "error", "message": "No candidates selected"}), 400
+    if not template_msg:
+        return jsonify({"status": "error", "message": "Message template is empty"}), 400
+        
+    api_url = get_setting("wa_api_url", "http://localhost:3000")
+    device_id = get_setting("wa_device_id", "default")
+    
+    # Reset state
+    wa_blast_state["status"] = "sending"
+    wa_blast_state["current"] = 0
+    wa_blast_state["total"] = len(candidate_ids)
+    wa_blast_state["success_count"] = 0
+    wa_blast_state["failed_count"] = 0
+    wa_blast_state["logs"] = []
+    
+    # Run in background
+    t = threading.Thread(target=run_wa_blast_thread, args=(candidate_ids, template_msg, api_url, device_id))
+    t.daemon = True
+    t.start()
+    
+    return jsonify({"status": "success", "message": "WhatsApp blast initiated"})
+
+@app.route('/api/wa/blast/status', methods=['GET'])
+def api_wa_blast_status():
+    """Returns the current background WhatsApp blast progress logs and counts."""
+    global wa_blast_state
+    return jsonify(wa_blast_state)
+
+@app.route('/api/wa/test', methods=['POST'])
+def api_wa_test():
+    """Sends a single test WhatsApp message with dummy candidate variables."""
+    data = request.json or {}
+    phone = data.get("phone")
+    api_url = data.get("wa_api_url")
+    device_id = data.get("wa_device_id")
+    template_msg = data.get("message_template", "")
+    
+    if not phone:
+        return jsonify({"status": "error", "message": "Test recipient phone number is required"}), 400
+    if not api_url:
+        return jsonify({"status": "error", "message": "GOWA API Base URL is required"}), 400
+        
+    jid = clean_phone_number(phone)
+    if not jid:
+        return jsonify({"status": "error", "message": "Invalid phone number format"}), 400
+        
+    # Compile mock message
+    msg = template_msg
+    msg = msg.replace("{{nama}}", "Budi Santoso").replace("{{Nama}}", "Budi Santoso")
+    msg = msg.replace("{{posisi}}", "Software Engineer").replace("{{Posisi}}", "Software Engineer")
+    msg = msg.replace("{{kampus}}", "Universitas Brawijaya").replace("{{Kampus}}", "Universitas Brawijaya")
+    
+    url = f"{api_url.rstrip('/')}/send/message"
+    headers = {"Content-Type": "application/json"}
+    if device_id and device_id.strip() != "":
+        headers["X-Device-Id"] = device_id
+        
+    payload = {
+        "phone": jid,
+        "message": msg
+    }
+    
+    try:
+        res = requests.post(url, json=payload, headers=headers, timeout=10)
+        if res.status_code in [200, 201]:
+            return jsonify({"status": "success", "message": f"Test message sent successfully to {jid}"})
+        else:
+            return jsonify({"status": "error", "message": f"HTTP {res.status_code}: {res.text}"}), 400
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Failed to connect to GOWA server: {str(e)}"}), 500
 
 # --- EXPORTS ---
 

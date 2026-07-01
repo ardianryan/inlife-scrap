@@ -2,11 +2,13 @@
 
 const API_BASE = window.location.origin;
 let syncInterval = null;
+let blastInterval = null;
 
-// --- PAGINATION STATE ---
+// --- PAGINATION & SELECTION STATE ---
 let allApplicants = [];
 let currentPage = 1;
 const rowsPerPage = 10;
+let selectedCandidateIds = [];
 
 // --- INITIALIZATION & SESSION PERSISTENCE ---
 document.addEventListener("DOMContentLoaded", () => {
@@ -202,7 +204,7 @@ async function loadApplicants() {
     const position = document.getElementById("filter-position").value;
     
     const tableBody = document.getElementById("applicants-table-body");
-    tableBody.innerHTML = '<tr><td colspan="7" class="table-placeholder">Filtering candidate logs...</td></tr>';
+    tableBody.innerHTML = '<tr><td colspan="8" class="table-placeholder">Filtering candidate logs...</td></tr>';
     
     try {
         const url = new URL(`${API_BASE}/api/applicants`);
@@ -216,10 +218,15 @@ async function loadApplicants() {
         allApplicants = await response.json();
         currentPage = 1;
         
+        // Reset selections on search/filter refresh to prevent mismatch
+        selectedCandidateIds = [];
+        updateBlastButtonState();
+        document.getElementById("check-all-candidates").checked = false;
+        
         displayApplicants();
         
     } catch (e) {
-        tableBody.innerHTML = '<tr><td colspan="7" class="table-placeholder" style="color: #dc2626;">Error retrieving data records.</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="8" class="table-placeholder" style="color: #dc2626;">Error retrieving data records.</td></tr>';
     }
 }
 
@@ -232,7 +239,7 @@ function displayApplicants() {
     tableBody.innerHTML = "";
     
     if (allApplicants.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="7" class="table-placeholder">No matching candidate profiles found.</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="8" class="table-placeholder">No matching candidate profiles found.</td></tr>';
         pagControls.classList.add("hidden");
         return;
     }
@@ -243,7 +250,13 @@ function displayApplicants() {
     const end = Math.min(start + rowsPerPage, allApplicants.length);
     const pageItems = allApplicants.slice(start, end);
     
+    // Check if all items on this page are selected to update the head checkbox
+    let allOnPageChecked = true;
+    
     pageItems.forEach(c => {
+        const isChecked = selectedCandidateIds.includes(c.id);
+        if (!isChecked) allOnPageChecked = false;
+        
         const rawStage = c.tahap ? c.tahap.toUpperCase() : "";
         const displayStage = c.tahap ? c.tahap.toUpperCase() : "-";
         
@@ -261,6 +274,9 @@ function displayApplicants() {
         
         const rowHTML = `
             <tr>
+                <td style="text-align: center;">
+                    <input type="checkbox" onchange="handleCandidateSelect(this, ${c.id})" ${isChecked ? "checked" : ""}>
+                </td>
                 <td style="font-weight: 700; color: #0f172a;" title="${c.name}">${c.name}</td>
                 <td title="${c.major}">${c.major}</td>
                 <td title="${c.university}">${c.university}</td>
@@ -272,6 +288,9 @@ function displayApplicants() {
         `;
         tableBody.insertAdjacentHTML("beforeend", rowHTML);
     });
+    
+    // Set status of Select All checkbox
+    document.getElementById("check-all-candidates").checked = allOnPageChecked && pageItems.length > 0;
     
     // Configure pagination panel visibility
     if (allApplicants.length > rowsPerPage) {
@@ -299,11 +318,199 @@ function nextPage() {
     }
 }
 
+// --- CHECKBOX SELECTION HANDLING ---
+function handleCandidateSelect(checkbox, id) {
+    if (checkbox.checked) {
+        if (!selectedCandidateIds.includes(id)) {
+            selectedCandidateIds.push(id);
+        }
+    } else {
+        selectedCandidateIds = selectedCandidateIds.filter(cid => cid !== id);
+    }
+    updateBlastButtonState();
+}
+
+function toggleSelectAllCandidates() {
+    const isChecked = document.getElementById("check-all-candidates").checked;
+    
+    // Calculate current page slice
+    const start = (currentPage - 1) * rowsPerPage;
+    const end = Math.min(start + rowsPerPage, allApplicants.length);
+    const pageItems = allApplicants.slice(start, end);
+    
+    pageItems.forEach(c => {
+        if (isChecked) {
+            if (!selectedCandidateIds.includes(c.id)) {
+                selectedCandidateIds.push(c.id);
+            }
+        } else {
+            selectedCandidateIds = selectedCandidateIds.filter(cid => cid !== c.id);
+        }
+    });
+    
+    // Re-render display to check/uncheck inputs
+    displayApplicants();
+    updateBlastButtonState();
+}
+
+function updateBlastButtonState() {
+    const btn = document.getElementById("btn-open-blast");
+    if (selectedCandidateIds.length > 0) {
+        btn.disabled = false;
+        btn.querySelector("span:last-child").textContent = `Blast WA (${selectedCandidateIds.length})`;
+    } else {
+        btn.disabled = true;
+        btn.querySelector("span:last-child").textContent = "Blast WA";
+    }
+}
+
+// --- WHATSAPP BLAST MODAL DIALOGS ---
+async function openBlastModal() {
+    if (selectedCandidateIds.length === 0) return;
+    
+    // Set recipient counts
+    document.getElementById("blast-recipient-count").textContent = selectedCandidateIds.length;
+    
+    // Show loading state in text box and log terminal
+    const txtArea = document.getElementById("blast-template-text");
+    txtArea.value = "Loading message template...";
+    txtArea.disabled = true;
+    
+    document.getElementById("blast-progress-section").classList.add("hidden");
+    document.getElementById("blast-console-logs").innerHTML = `<div style="color:var(--text-muted);">Console ready. Waiting to send...</div>`;
+    
+    // Show Modal overlay
+    document.getElementById("blast-modal").classList.remove("hidden");
+    
+    try {
+        // Fetch default WA template from server settings API
+        const response = await fetch(`${API_BASE}/api/settings`);
+        const data = await response.json();
+        
+        txtArea.value = data.wa_template || "";
+        txtArea.disabled = false;
+        
+    } catch (e) {
+        txtArea.value = "Halo {{nama}},\n\nKami dari Inlife Surabaya...";
+        txtArea.disabled = false;
+    }
+}
+
+function closeBlastModal() {
+    document.getElementById("blast-modal").classList.add("hidden");
+    if (blastInterval) {
+        clearInterval(blastInterval);
+        blastInterval = null;
+    }
+}
+
+async function startWaBlast() {
+    const templateMsg = document.getElementById("blast-template-text").value;
+    if (!templateMsg.trim()) {
+        alert("Pesan template tidak boleh kosong.");
+        return;
+    }
+    
+    const sendBtn = document.getElementById("btn-send-blast");
+    const cancelBtn = document.getElementById("btn-cancel-blast");
+    
+    sendBtn.disabled = true;
+    cancelBtn.disabled = true;
+    
+    try {
+        const response = await fetch(`${API_BASE}/api/wa/blast`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                candidate_ids: selectedCandidateIds,
+                message_template: templateMsg
+            })
+        });
+        
+        if (response.ok) {
+            // Show progress UI and poll progress every 500ms
+            document.getElementById("blast-progress-section").classList.remove("hidden");
+            document.getElementById("blast-console-logs").innerHTML = `<div class="terminal-line">Starting WhatsApp broadcast scheduler (Min. 5s delay)...</div>`;
+            
+            pollBlastStatus();
+        } else {
+            const data = await response.json();
+            alert(`Error: ${data.message || "Failed to trigger broadcast"}`);
+            sendBtn.disabled = false;
+            cancelBtn.disabled = false;
+        }
+    } catch (e) {
+        alert("Connection failed.");
+        sendBtn.disabled = false;
+        cancelBtn.disabled = false;
+    }
+}
+
+function pollBlastStatus() {
+    if (blastInterval) clearInterval(blastInterval);
+    
+    blastInterval = setInterval(async () => {
+        try {
+            const res = await fetch(`${API_BASE}/api/wa/blast/status`);
+            const state = await res.json();
+            
+            // Calculate progress percent
+            const percent = state.total > 0 ? Math.round((state.current / state.total) * 100) : 0;
+            document.getElementById("blast-progress-text").textContent = `Sending broadcast: ${state.current}/${state.total}`;
+            document.getElementById("blast-progress-percent").textContent = `${percent}%`;
+            document.getElementById("blast-progress-bar").style.width = `${percent}%`;
+            
+            // Success & failed labels
+            document.getElementById("blast-success-label").textContent = state.success_count;
+            document.getElementById("blast-failed-label").textContent = state.failed_count;
+            
+            // Render terminal logs
+            const consoleBox = document.getElementById("blast-console-logs");
+            consoleBox.innerHTML = "";
+            state.logs.forEach(log => {
+                consoleBox.insertAdjacentHTML("afterbegin", `<div class="terminal-line">${log}</div>`);
+            });
+            
+            if (state.status !== "sending") {
+                // Completed or error exited
+                clearInterval(blastInterval);
+                blastInterval = null;
+                
+                document.getElementById("btn-send-blast").disabled = false;
+                document.getElementById("btn-cancel-blast").disabled = false;
+                
+                if (state.status === "complete") {
+                    alert("WhatsApp Broadcast completed!");
+                    // Reset selected checkboxes and counts
+                    selectedCandidateIds = [];
+                    updateBlastButtonState();
+                    document.getElementById("check-all-candidates").checked = false;
+                    closeBlastModal();
+                    // Reload data
+                    loadApplicants();
+                } else if (state.status === "error") {
+                    alert("WhatsApp Broadcast ended with errors. Please check GOWA connection.");
+                }
+            }
+        } catch (e) {
+            clearInterval(blastInterval);
+            blastInterval = null;
+            document.getElementById("btn-send-blast").disabled = false;
+            document.getElementById("btn-cancel-blast").disabled = false;
+        }
+    }, 500);
+}
+
 // --- EXCEL DOWNLOADS ---
 function exportExcel() {
     const search = document.getElementById("filter-search").value;
     const major = document.getElementById("filter-major").value;
     const position = document.getElementById("filter-position").value;
+    
+    const url = new URL(`${API_BASE}/api/export`);
+    if (search) url.searchParams.append("search", search);
+    if (major) url.searchParams.append("major", major);
+    if (position) url.searchParams.append("position", position);
     
     // Check if running inside the native Desktop PyWebview wrapper
     if (window.pywebview && window.pywebview.api && window.pywebview.api.download_excel) {
@@ -315,11 +522,6 @@ function exportExcel() {
             }
         });
     } else {
-        // Fallback for standard browsers
-        const url = new URL(`${API_BASE}/api/export`);
-        if (search) url.searchParams.append("search", search);
-        if (major) url.searchParams.append("major", major);
-        if (position) url.searchParams.append("position", position);
         window.location.href = url.toString();
     }
 }
@@ -331,15 +533,10 @@ async function loadSyncInfo() {
         const settings = await settingsRes.json();
         document.getElementById("sync-active-email").textContent = settings.mentor_email;
         
-        // Double check internet network speed connectivity
-        const statsRes = await fetch(`${API_BASE}/api/stats`);
-        const stats = await statsRes.json();
-        
         const banner = document.getElementById("sync-connection-banner");
         const syncBtn = document.getElementById("btn-start-sync");
         const sidebarStatus = document.getElementById("connection-status");
         
-        // Determine network connectivity via a quick target API head call
         const isOnline = await checkConnectivity();
         
         if (isOnline) {
@@ -356,7 +553,6 @@ async function loadSyncInfo() {
             sidebarStatus.querySelector(".label").textContent = "Offline";
         }
         
-        // Resume polling if sync is already running in background
         checkSyncRunningState();
         
     } catch (e) {
@@ -366,11 +562,9 @@ async function loadSyncInfo() {
 
 async function checkConnectivity() {
     try {
-        // Perform local HEAD checking
         const res = await fetch(`${API_BASE}/api/stats`);
         if (res.ok) {
-            // Check if stats returned an online flag or try to fetch a fast ping
-            const status = await fetch("https://apply.inlifesurabaya.com/assets/logo_inlife.png", { method: "HEAD", mode: "no-cors", cache: "no-cache" });
+            await fetch("https://apply.inlifesurabaya.com/assets/logo_inlife.png", { method: "HEAD", mode: "no-cors", cache: "no-cache" });
             return true;
         }
         return false;
@@ -422,13 +616,11 @@ function startPollingStatus() {
             const res = await fetch(`${API_BASE}/api/sync/status`);
             const state = await res.json();
             
-            // Update counts & progress bar
             const percent = state.total > 0 ? Math.round((state.current / state.total) * 100) : 0;
             document.getElementById("sync-progress-text").textContent = `Downloading profile: ${state.current}/${state.total}`;
             document.getElementById("sync-progress-percent").textContent = `${percent}%`;
             document.getElementById("sync-progress-bar").style.width = `${percent}%`;
             
-            // Update terminal logs
             const consoleBox = document.getElementById("sync-console-logs");
             consoleBox.innerHTML = "";
             state.logs.forEach(log => {
@@ -436,18 +628,15 @@ function startPollingStatus() {
             });
             
             if (state.status !== "running") {
-                // Completed or error exited
                 clearInterval(syncInterval);
                 document.getElementById("btn-start-sync").disabled = false;
                 if (state.status === "complete") {
                     alert("Synchronization completed successfully.");
-                    // Invalidate filter caches to capture any new entries
                     filtersLoaded = false;
                 } else if (state.status === "error") {
                     alert("Synchronization halted with errors. Check logs.");
                 }
             }
-            
         } catch (e) {
             clearInterval(syncInterval);
             document.getElementById("btn-start-sync").disabled = false;
@@ -455,14 +644,21 @@ function startPollingStatus() {
     }, 500);
 }
 
-// --- SETTINGS SECTION ---
+// --- SETTINGS CONFIGURATIONS ---
 async function loadSettings() {
     try {
         const response = await fetch(`${API_BASE}/api/settings`);
-        const settings = await response.json();
+        const data = await response.json();
         
-        document.getElementById("settings-email").value = settings.mentor_email;
-        document.getElementById("settings-password").value = settings.mentor_password;
+        // Fill Mentor Credentials
+        document.getElementById("settings-email").value = data.mentor_email || "";
+        document.getElementById("settings-password").value = data.mentor_password || "";
+        
+        // Fill WhatsApp Settings
+        document.getElementById("settings-wa-url").value = data.wa_api_url || "";
+        document.getElementById("settings-wa-device").value = data.wa_device_id || "";
+        document.getElementById("settings-wa-template").value = data.wa_template || "";
+        document.getElementById("settings-wa-test-phone").value = data.wa_test_phone || "";
         
         // Reset check box and clear button
         document.getElementById("confirm-cache-clear").checked = false;
@@ -496,6 +692,82 @@ async function saveSettings(event) {
     }
 }
 
+async function saveWaSettings(event) {
+    event.preventDefault();
+    const url = document.getElementById("settings-wa-url").value;
+    const device = document.getElementById("settings-wa-device").value;
+    const template = document.getElementById("settings-wa-template").value;
+    const testPhone = document.getElementById("settings-wa-test-phone").value;
+    
+    try {
+        const response = await fetch(`${API_BASE}/api/settings`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                wa_api_url: url,
+                wa_device_id: device,
+                wa_template: template,
+                wa_test_phone: testPhone
+            })
+        });
+        
+        if (response.ok) {
+            alert("WhatsApp GOWA configurations successfully updated.");
+            loadSettings();
+        } else {
+            alert("Failed to save WhatsApp settings.");
+        }
+    } catch (e) {
+        alert("Connection error.");
+    }
+}
+
+async function sendTestWaMessage() {
+    const url = document.getElementById("settings-wa-url").value;
+    const device = document.getElementById("settings-wa-device").value;
+    const template = document.getElementById("settings-wa-template").value;
+    const testPhone = document.getElementById("settings-wa-test-phone").value;
+    
+    if (!testPhone.trim()) {
+        alert("Masukkan nomor telepon tujuan uji coba terlebih dahulu.");
+        return;
+    }
+    if (!url.trim()) {
+        alert("Masukkan URL API GOWA terlebih dahulu.");
+        return;
+    }
+    
+    const btn = document.getElementById("btn-send-test-wa");
+    const origText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `<span class="material-icons" style="font-size: 1.1rem; margin-right: 6px; vertical-align: middle;">sync</span><span style="vertical-align: middle;">Sending test...</span>`;
+    
+    try {
+        const response = await fetch(`${API_BASE}/api/wa/test`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                phone: testPhone,
+                wa_api_url: url,
+                wa_device_id: device,
+                message_template: template
+            })
+        });
+        
+        const result = await response.json();
+        if (response.ok) {
+            alert(`Uji coba sukses!\n${result.message}`);
+        } else {
+            alert(`Gagal mengirim pesan uji coba:\n${result.message}`);
+        }
+    } catch (e) {
+        alert(`Terjadi error koneksi ke Flask server: ${e.message}`);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = origText;
+    }
+}
+
 function toggleClearButton() {
     const isChecked = document.getElementById("confirm-cache-clear").checked;
     document.getElementById("btn-clear-cache").disabled = !isChecked;
@@ -511,7 +783,6 @@ async function clearCache() {
         if (response.ok) {
             alert("Local candidates database has been cleared.");
             loadSettings();
-            // Invalidate filters
             filtersLoaded = false;
         } else {
             alert("Failed to clear database cache.");
