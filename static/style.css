@@ -520,6 +520,8 @@ h1, h2, h3, h4, h5, h6 {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 15px;
+    flex-wrap: wrap;
+    gap: 12px;
 }
 
 .candidates-count {
@@ -543,6 +545,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .data-table {
     width: 100%;
+    min-width: 1050px; /* Prevent column squishing on narrow layouts */
     border-collapse: collapse;
     font-family: var(--font-body);
     font-size: 0.88rem;
