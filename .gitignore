@@ -1,0 +1,17 @@
+# Python virtual environment
+.venv/
+venv/
+ENV/
+
+# Python caching
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Local SQLite database (contains mentor credentials & scraped data)
+interns.db
+
+# OS specific files
+.DS_Store
+Thumbs.db
