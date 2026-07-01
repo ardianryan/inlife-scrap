@@ -303,8 +303,16 @@
                             <input type="url" id="settings-wa-url" required placeholder="e.g. http://localhost:3000">
                         </div>
                         <div class="input-group">
-                            <label for="settings-wa-device">WhatsApp Device ID</label>
-                            <input type="text" id="settings-wa-device" required placeholder="e.g. default">
+                            <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; margin-bottom: 6px;">
+                                <label style="margin: 0; font-weight: 600; color: var(--text-secondary);">WhatsApp Devices (Select multiple for Round-Robin)</label>
+                                <button type="button" onclick="fetchGowaDevices()" class="btn btn-secondary" style="font-size: 0.72rem; padding: 4px 8px; font-weight: 700; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--border-color); background: #f8fafc; height: auto;">
+                                    <span class="material-icons" style="font-size: 0.95rem;">refresh</span> Sync Devices
+                                </button>
+                            </div>
+                            <div id="settings-wa-devices-container" style="padding: 12px; border: 1px solid var(--border-input); border-radius: 6px; background-color: #f8fafc; max-height: 160px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; min-height: 50px;">
+                                <span style="font-size: 0.85rem; color: var(--text-muted);">Please connect your WhatsApp account in the pairing panel below first, then click "Sync Devices".</span>
+                            </div>
+                            <input type="hidden" id="settings-wa-device">
                         </div>
                         <div class="input-group">
                             <label for="settings-wa-delay">Delay Between Messages (Seconds)</label>

@@ -258,17 +258,25 @@ def clean_phone_number(phone):
 
 wa_blast_lock = threading.Lock()
 
-def run_wa_blast_thread(candidate_ids, template_msg, api_url, device_id):
-    """Worker thread that formats messages and sends them to the local GOWA API."""
+def run_wa_blast_thread(candidate_ids, template_msg, api_url, device_ids_str):
+    """Worker thread that formats messages and sends them using round-robin device selection."""
     global wa_blast_state
     try:
+        # Clean device IDs
+        devices = [d.strip() for d in device_ids_str.split(",") if d.strip()]
+        if not devices:
+            devices = ["default"]
+            
         # Load user configured delay setting (default: 5 seconds)
         try:
             delay_seconds = int(get_setting("wa_delay", "5"))
         except Exception:
             delay_seconds = 5
             
-        wa_blast_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] Memulai pengiriman blast WhatsApp ke {len(candidate_ids)} pelamar (Delay: {delay_seconds} detik)...")
+        wa_blast_state["logs"].append(
+            f"[{datetime.now().strftime('%H:%M:%S')}] Memulai pengiriman blast WhatsApp ke {len(candidate_ids)} pelamar "
+            f"menggunakan {len(devices)} device secara Round-Robin (Delay: {delay_seconds} detik)..."
+        )
         
         # Connect to SQLite
         conn = sqlite3.connect(DB_PATH)
@@ -277,6 +285,9 @@ def run_wa_blast_thread(candidate_ids, template_msg, api_url, device_id):
         
         for idx, cid in enumerate(candidate_ids):
             wa_blast_state["current"] = idx + 1
+            
+            # Select active device using round-robin
+            active_device = devices[idx % len(devices)]
             
             c.execute("SELECT name, position_title, university, phone_number FROM applicants WHERE id = ?", (cid,))
             row = c.fetchone()
@@ -303,12 +314,13 @@ def run_wa_blast_thread(candidate_ids, template_msg, api_url, device_id):
                 wa_blast_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] GAGAL: Nomor telepon pelamar {name} kosong.")
                 continue
                 
-            # Endpoint GOWA
-            url = f"{api_url.rstrip('/')}/send/message"
-            headers = {"Content-Type": "application/json"}
-            if device_id and device_id.strip() != "":
-                headers["X-Device-Id"] = device_id
-                
+            # Endpoint GOWA with device selection
+            url = f"{api_url.rstrip('/')}/send/message?device_id={active_device}"
+            headers = {
+                "Content-Type": "application/json",
+                "X-Device-Id": active_device
+            }
+            
             payload = {
                 "phone": jid,
                 "message": msg
@@ -319,13 +331,13 @@ def run_wa_blast_thread(candidate_ids, template_msg, api_url, device_id):
                 res = requests.post(url, json=payload, headers=headers, timeout=7)
                 if res.status_code in [200, 201]:
                     wa_blast_state["success_count"] += 1
-                    wa_blast_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] BERHASIL: Pesan dikirim ke {name} ({phone})")
+                    wa_blast_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] BERHASIL: Pesan dikirim ke {name} ({phone}) via device {active_device}")
                 else:
                     wa_blast_state["failed_count"] += 1
-                    wa_blast_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] GAGAL: {name} ({phone}) - HTTP {res.status_code}: {res.text}")
+                    wa_blast_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] GAGAL: {name} ({phone}) - HTTP {res.status_code} via {active_device}: {res.text}")
             except Exception as err:
                 wa_blast_state["failed_count"] += 1
-                wa_blast_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] GAGAL: {name} ({phone}) - Error koneksi: {str(err)}")
+                wa_blast_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] GAGAL: {name} ({phone}) - Error koneksi via {active_device}: {str(err)}")
                 
             # Jeda dinamis berdasarkan pengaturan user
             time.sleep(delay_seconds)
@@ -363,7 +375,7 @@ def api_wa_blast():
         return jsonify({"status": "error", "message": "Message template is empty"}), 400
         
     api_url = get_setting("wa_api_url", "http://localhost:3000")
-    device_id = get_setting("wa_device_id", "default")
+    device_ids_str = get_setting("wa_device_ids", "default")
     
     # Try acquiring the lock. If locked, block concurrent call
     if not wa_blast_lock.acquire(blocking=False):
@@ -379,7 +391,7 @@ def api_wa_blast():
         wa_blast_state["logs"] = []
         
         # Run in background
-        t = threading.Thread(target=run_wa_blast_thread, args=(candidate_ids, template_msg, api_url, device_id))
+        t = threading.Thread(target=run_wa_blast_thread, args=(candidate_ids, template_msg, api_url, device_ids_str))
         t.daemon = True
         t.start()
         
@@ -390,6 +402,19 @@ def api_wa_blast():
         except RuntimeError:
             pass
         return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/wa/devices', methods=['GET'])
+def api_wa_devices():
+    """Fetches registered devices from GOWA server API."""
+    api_url = get_setting("wa_api_url", "http://localhost:3000")
+    try:
+        res = requests.get(f"{api_url.rstrip('/')}/devices", timeout=3)
+        if res.status_code == 200:
+            return jsonify(res.json())
+        else:
+            return jsonify({"status": False, "message": f"HTTP {res.status_code} error from GOWA", "data": []})
+    except Exception as e:
+        return jsonify({"status": False, "message": f"Could not connect to GOWA server: {str(e)}", "data": []})
 
 @app.route('/api/wa/blast/status', methods=['GET'])
 def api_wa_blast_status():

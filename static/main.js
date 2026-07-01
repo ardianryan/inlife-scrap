@@ -741,6 +741,9 @@ async function loadSettings() {
         document.getElementById("settings-wa-test-phone").value = data.wa_test_phone || "";
         document.getElementById("settings-wa-delay").value = data.wa_delay || "5";
         
+        // Fetch GOWA devices checkbox list
+        fetchGowaDevices(data.wa_device_id || "");
+        
         // Reset check box and clear button
         document.getElementById("confirm-cache-clear").checked = false;
         document.getElementById("btn-clear-cache").disabled = true;
@@ -776,10 +779,19 @@ async function saveSettings(event) {
 async function saveWaSettings(event) {
     event.preventDefault();
     const url = document.getElementById("settings-wa-url").value;
-    const device = document.getElementById("settings-wa-device").value;
     const template = document.getElementById("settings-wa-template").value;
     const testPhone = document.getElementById("settings-wa-test-phone").value;
     const delay = document.getElementById("settings-wa-delay").value;
+    
+    // Gather checked GOWA devices
+    const checkboxes = document.querySelectorAll("#settings-wa-devices-container input[name='wa-device-checkbox']");
+    const checkedDevices = [];
+    checkboxes.forEach(cb => {
+        if (cb.checked) {
+            checkedDevices.push(cb.value);
+        }
+    });
+    const device = checkedDevices.length > 0 ? checkedDevices.join(",") : "default";
     
     try {
         const response = await fetch(`${API_BASE}/api/settings`, {
@@ -807,9 +819,18 @@ async function saveWaSettings(event) {
 
 async function sendTestWaMessage() {
     const url = document.getElementById("settings-wa-url").value;
-    const device = document.getElementById("settings-wa-device").value;
     const template = document.getElementById("settings-wa-template").value;
     const testPhone = document.getElementById("settings-wa-test-phone").value;
+    
+    // Choose first checked GOWA device for testing
+    const checkboxes = document.querySelectorAll("#settings-wa-devices-container input[name='wa-device-checkbox']");
+    const checkedDevices = [];
+    checkboxes.forEach(cb => {
+        if (cb.checked) {
+            checkedDevices.push(cb.value);
+        }
+    });
+    const device = checkedDevices.length > 0 ? checkedDevices[0] : "default";
     
     if (!testPhone.trim()) {
         alert("Masukkan nomor telepon tujuan uji coba terlebih dahulu.");
@@ -848,6 +869,63 @@ async function sendTestWaMessage() {
     } finally {
         btn.disabled = false;
         btn.innerHTML = origText;
+    }
+}
+
+async function fetchGowaDevices(savedDeviceIdsStr = "") {
+    const container = document.getElementById("settings-wa-devices-container");
+    if (!container) return;
+    
+    if (!savedDeviceIdsStr) {
+        savedDeviceIdsStr = document.getElementById("settings-wa-device").value || "";
+    }
+    
+    const savedIds = savedDeviceIdsStr.split(",").map(id => id.trim()).filter(id => id);
+    
+    try {
+        container.innerHTML = '<span style="font-size: 0.85rem; color: var(--text-muted);">Fetching devices from GOWA server...</span>';
+        
+        const response = await fetch(`${API_BASE}/api/wa/devices`);
+        const json = await response.json();
+        
+        if (json && json.status && json.data && json.data.length > 0) {
+            container.innerHTML = "";
+            json.data.forEach(dev => {
+                const devId = dev.device_id;
+                const isChecked = savedIds.includes(devId) || (savedIds.length === 0 && devId === "default");
+                const badgeColor = dev.status === "connected" ? "#22c55e" : "#ef4444";
+                
+                const itemHTML = `
+                    <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.88rem; font-weight: 600; color: var(--text-primary);">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none;">
+                            <input type="checkbox" name="wa-device-checkbox" value="${devId}" ${isChecked ? "checked" : ""} style="cursor: pointer;">
+                            <span style="font-weight: 700;">${dev.name || "Unnamed Device"}</span>
+                            <span style="color: var(--text-secondary); font-size: 0.8rem; font-weight: 500;">(${devId.split('@')[0]})</span>
+                        </label>
+                        <span style="font-size: 0.75rem; font-weight: 700; padding: 2px 8px; border-radius: 100px; background-color: ${badgeColor}15; color: ${badgeColor}; border: 1px solid ${badgeColor}30;">
+                            ${dev.status || "offline"}
+                        </span>
+                    </div>
+                `;
+                container.insertAdjacentHTML("beforeend", itemHTML);
+            });
+        } else {
+            container.innerHTML = `
+                <div style="display: flex; flex-direction: column; gap: 6px; font-size: 0.85rem; color: #dc2626;">
+                    <span>No devices found on GOWA server.</span>
+                    <span style="color: var(--text-secondary); font-size: 0.78rem;">
+                        Please create and connect a device in the GOWA dashboard below first, then click "Sync Devices".
+                    </span>
+                </div>
+            `;
+        }
+    } catch (err) {
+        console.error("Failed to fetch devices:", err);
+        container.innerHTML = `
+            <span style="font-size: 0.85rem; color: #dc2626;">
+                Failed to connect to GOWA server. Make sure GOWA is active on port 3000.
+            </span>
+        `;
     }
 }
 
