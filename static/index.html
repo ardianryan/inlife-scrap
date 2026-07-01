@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Internship Scraper Console</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Plus+Jakarta+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- --- SECURE LOGIN SCREEN OVERLAY --- -->
+    <div id="login-screen" class="login-view">
+        <div class="login-shell">
+            <div style="text-align: center; margin-bottom: 25px;">
+                <div class="lock-icon-container">
+                    <span class="material-icons">lock</span>
+                </div>
+                <h2>Scraper Console</h2>
+                <p>Sign in to access the administrator panel.</p>
+            </div>
+            
+            <form id="login-form" onsubmit="handleLogin(event)">
+                <div class="input-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" value="admin" required placeholder="Enter username...">
+                </div>
+                <div class="input-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" value="admin1234567890" required placeholder="Enter password...">
+                </div>
+                
+                <div id="login-error" class="error-msg hidden">Invalid username or password.</div>
+                
+                <button type="submit" class="btn btn-primary btn-block">Sign In</button>
+            </form>
+        </div>
+        <div class="version-tag">Internship Scraper v1.4.0</div>
+    </div>
+
+    <!-- --- MAIN CONSOLE BOARD --- -->
+    <div id="app-screen" class="app-view hidden">
+        
+        <!-- --- SIDEBAR NAVIGATION PANEL --- -->
+        <aside class="sidebar">
+            <div class="logo-container">
+                <img src="https://apply.inlifesurabaya.com/assets/logo_inlife.png" alt="Inlife Logo">
+            </div>
+            
+            <nav class="sidebar-nav">
+                <h3>Navigation</h3>
+                <a href="#" onclick="switchPage('Dashboard')" id="nav-Dashboard" class="nav-item active">
+                    <span class="material-icons">dashboard</span>
+                    <span>Dashboard</span>
+                </a>
+                <a href="#" onclick="switchPage('Sync')" id="nav-Sync" class="nav-item">
+                    <span class="material-icons">sync</span>
+                    <span>Sync Data</span>
+                </a>
+                <a href="#" onclick="switchPage('Settings')" id="nav-Settings" class="nav-item">
+                    <span class="material-icons">settings</span>
+                    <span>Configuration</span>
+                </a>
+            </nav>
+            
+            <div class="divider"></div>
+            
+            <div class="sidebar-section">
+                <h3>Connection</h3>
+                <div id="connection-status" class="status-indicator">
+                    <span class="dot"></span>
+                    <span class="label">Checking...</span>
+                </div>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <div class="sidebar-section">
+                <h3>Local Storage</h3>
+                <div class="storage-details">
+                    <div>Database: <b>interns.db</b></div>
+                    <div>Size: <b id="db-size-label">0.0 KB</b></div>
+                </div>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <div class="sidebar-section logout-section">
+                <h3>User Session</h3>
+                <div class="session-info">Role: <b>Administrator</b></div>
+                <button onclick="handleLogout()" class="btn btn-logout btn-block">Logout</button>
+            </div>
+        </aside>
+
+        <!-- --- MAIN CONTENT AREA --- -->
+        <main class="content-area">
+            
+            <!-- 1. DASHBOARD VIEW -->
+            <section id="view-Dashboard" class="view-panel">
+                <div class="brand-header">
+                    <h1 class="brand-title">Internship Candidates</h1>
+                    <p class="brand-desc">Detailed profiles and database query interface for applicants registered through the mentor portal.</p>
+                </div>
+                
+                <!-- KPI Section -->
+                <div class="kpi-grid">
+                    <div class="bezel-shell">
+                        <div class="bezel-core">
+                            <div class="kpi-content">
+                                <div>
+                                    <div class="kpi-title">Total Candidates</div>
+                                    <div class="kpi-value" id="kpi-total-candidates">0</div>
+                                </div>
+                                <span class="material-icons kpi-icon">group</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bezel-shell">
+                        <div class="bezel-core">
+                            <div class="kpi-content">
+                                <div>
+                                    <div class="kpi-title">Active Positions</div>
+                                    <div class="kpi-value" id="kpi-active-positions">0</div>
+                                </div>
+                                <span class="material-icons kpi-icon">work</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bezel-shell">
+                        <div class="bezel-core">
+                            <div class="kpi-content">
+                                <div>
+                                    <div class="kpi-title">Last Updated</div>
+                                    <div class="kpi-value kpi-value-small" id="kpi-last-updated">Checking...</div>
+                                </div>
+                                <span class="material-icons kpi-icon">access_time</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Position Breakdown Panel -->
+                <div class="panel panel-bordered position-breakdown-card">
+                    <h5 class="panel-title">Candidate Distribution by Position</h5>
+                    <div id="position-breakdown-container" class="grid-2-cols">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+                
+                <!-- Search & Filters Panel -->
+                <div class="panel panel-bordered filters-card">
+                    <h5 class="panel-title">Search Filters</h5>
+                    <div class="filters-grid">
+                        <div class="input-group">
+                            <label for="filter-search">Search Name / University / Email</label>
+                            <input type="text" id="filter-search" oninput="loadApplicants()" placeholder="Type keywords...">
+                        </div>
+                        <div class="input-group">
+                            <label for="filter-major">Academic Major</label>
+                            <select id="filter-major" onchange="loadApplicants()">
+                                <option value="All Majors">All Majors</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label for="filter-position">Applied Position</label>
+                            <select id="filter-position" onchange="loadApplicants()">
+                                <option value="All Positions">All Positions</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Candidates Table View -->
+                <div class="applicants-section">
+                    <div class="applicants-header">
+                        <span id="candidates-count-label" class="candidates-count">Loading candidates...</span>
+                    </div>
+                    
+                    <div class="table-container bezel-shell">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Full Name</th>
+                                    <th>Academic Major</th>
+                                    <th>University</th>
+                                    <th>Phone Number</th>
+                                    <th>Email Address</th>
+                                    <th>Position</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="applicants-table-body">
+                                <tr>
+                                    <td colspan="7" class="table-placeholder">Loading applicants records...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- Export Excel Area -->
+                <div class="panel panel-bordered export-card">
+                    <h5 class="panel-title">Export Interface</h5>
+                    <p>Download formatted Excel document containing the current filtered results. Columns included: <b>Nama</b>, <b>Nomor WA/HP</b>, and <b>Email</b>.</p>
+                    <button id="btn-export-excel" onclick="exportExcel()" class="btn btn-secondary">
+                        Download Excel File
+                    </button>
+                </div>
+            </section>
+            
+            <!-- 2. SYNC VIEW -->
+            <section id="view-Sync" class="view-panel hidden">
+                <div class="brand-header">
+                    <h1 class="brand-title">Portal Synchronization</h1>
+                    <p class="brand-desc">Crawl and sync detailed candidate records from the mentor platform API.</p>
+                </div>
+                
+                <div class="sync-status-card panel">
+                    <div class="authorized-info">Authorized Scraper Account: <span id="sync-active-email" style="font-weight: 700;">loading...</span></div>
+                    
+                    <!-- Online / Offline Banner -->
+                    <div id="sync-connection-banner" class="connection-banner check">Checking connection...</div>
+                    
+                    <button id="btn-start-sync" onclick="startSync()" class="btn btn-primary btn-block">Sync Now</button>
+                    
+                    <!-- Progress Section -->
+                    <div id="sync-progress-area" class="progress-area hidden">
+                        <div class="progress-labels">
+                            <span id="sync-progress-text">Downloading profile: 0/0</span>
+                            <span id="sync-progress-percent">0%</span>
+                        </div>
+                        <div class="progress-bar-bg">
+                            <div id="sync-progress-bar" class="progress-bar-fill" style="width: 0%;"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Console Terminal Output -->
+                    <div class="console-label">Synchronization logs:</div>
+                    <div id="sync-console-logs" class="console-box">
+                        <!-- Terminal messages inserted here -->
+                    </div>
+                </div>
+            </section>
+            
+            <!-- 3. SETTINGS VIEW -->
+            <section id="view-Settings" class="view-panel hidden">
+                <div class="brand-header">
+                    <h1 class="brand-title">System Configurations</h1>
+                    <p class="brand-desc">Configure authentication credentials and manage local database operations.</p>
+                </div>
+                
+                <div class="panel panel-bordered">
+                    <h5 class="panel-title">Mentor Portal Credentials</h5>
+                    <form id="settings-form" onsubmit="saveSettings(event)">
+                        <div class="input-group">
+                            <label for="settings-email">Account Email Address</label>
+                            <input type="email" id="settings-email" required placeholder="e.g. mentor@gmail.com">
+                        </div>
+                        <div class="input-group">
+                            <label for="settings-password">Account Password</label>
+                            <input type="password" id="settings-password" required placeholder="Enter password...">
+                        </div>
+                        <button type="submit" class="btn btn-primary">Save Settings</button>
+                    </form>
+                </div>
+                
+                <div class="panel panel-bordered" style="margin-top: 25px;">
+                    <h5 class="panel-title">Cache Maintenance</h5>
+                    <p>Wipe cached records from the database table. This action does not affect credentials.</p>
+                    
+                    <div class="checkbox-group" style="margin-bottom: 15px;">
+                        <input type="checkbox" id="confirm-cache-clear" onchange="toggleClearButton()">
+                        <label for="confirm-cache-clear" style="font-weight: 600; color: #dc2626;">Confirm deletion of all cached candidate profiles.</label>
+                    </div>
+                    
+                    <button id="btn-clear-cache" onclick="clearCache()" class="btn btn-logout" disabled>Clear SQLite Cache</button>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Core Javascript Code -->
+    <script src="main.js"></script>
+</body>
+</html>

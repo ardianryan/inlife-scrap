@@ -29,4 +29,14 @@ pip install -r requirements.txt
 
 # Run Desktop app wrapper with web browser fallback
 echo "Launching Scraper Console..."
-python desktop.py || python3 -m streamlit run app.py --browser.gatherUsageStats false
+if ! python desktop.py; then
+    echo ""
+    echo "Desktop window engine not supported on this PC."
+    echo "Launching in web browser fallback mode..."
+    if command -v open &> /dev/null; then
+        open http://127.0.0.1:5000/
+    elif command -v xdg-open &> /dev/null; then
+        xdg-open http://127.0.0.1:5000/
+    fi
+    python3 app.py
+fi
