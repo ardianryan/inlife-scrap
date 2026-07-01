@@ -480,5 +480,13 @@ def api_export():
 if __name__ == '__main__':
     # Initialize DB schema
     init_db()
+    
+    # Try starting GOWA background service
+    try:
+        import gowa_manager
+        gowa_manager.start_gowa()
+    except Exception as e:
+        print("[App] Failed to start GOWA manager:", str(e))
+        
     port = int(os.environ.get("PORT", 5000))
     app.run(host='127.0.0.1', port=port, debug=False)
