@@ -122,14 +122,17 @@ def get_gowa_binary_path():
             pass
         return p1
         
-    # Walk folder for executables
+    # Walk folder for executables (anything that's not markdown, archive or metadata files)
     for root, dirs, files in os.walk(bin_dir):
         for f in files:
-            if f.startswith("whatsapp") or "go-whatsapp" in f:
-                if system == "windows" and f.endswith(".exe"):
-                    return os.path.join(root, f)
-                elif system != "windows" and not f.endswith((".zip", ".tar.gz", ".txt", ".md", ".json")):
-                    path = os.path.join(root, f)
+            f_lower = f.lower()
+            if f_lower.endswith((".zip", ".tar.gz", ".tgz", ".txt", ".md", ".json")):
+                continue
+            path = os.path.join(root, f)
+            if os.path.isfile(path):
+                if system == "windows" and f_lower.endswith(".exe"):
+                    return path
+                elif system != "windows":
                     try:
                         os.chmod(path, 0o755)
                     except Exception:
